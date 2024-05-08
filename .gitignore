@@ -1,0 +1,15 @@
+/venv
+.env
+*/migrations/*
+/__pycache__/
+*.pyc
+db.sqlite3
+info.log
+app.log
+celerybeat-schedule.bak
+celerybeat-schedule.dat
+celerybeat-schedule.dir
+logs/**
+notes.txt
+.env.prod
+.ToDo
