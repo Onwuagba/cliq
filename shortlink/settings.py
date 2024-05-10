@@ -103,6 +103,60 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {},
+    "formatters": {
+        "verbose": {
+            "format": (
+                "[%(asctime)s] %(levelname)s [%(name)s-%(lineno)s] %(module)s "
+                "%(message)s"
+            ),
+            "datefmt": "%d/%b/%Y %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": "logs/debug.log",
+            "formatter": "verbose",
+            "level": "DEBUG",
+        },
+        "error_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": f"logs/app-{datetime.datetime.now():%Y-%m-%d}-error.log",
+            "when": "midnight",
+            "backupCount": 10,
+            "formatter": "verbose",
+            "level": "ERROR",
+        },
+        "info_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": f"logs/app-{datetime.datetime.now():%Y-%m-%d}-info.log",
+            "when": "midnight",
+            "backupCount": 10,
+            "formatter": "verbose",
+            "level": "INFO",
+        },
+    },
+    "loggers": {
+        "app": {
+            "handlers": ["console", "error_file", "info_file"],
+            "level": "INFO",
+        },
+        "app_debug": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+        },
+    },
+}
+
+
 SIMPLE_JWT = {
     "USER_ID_FIELD": "uid",
     "AUTH_HEADER_TYPES": ("Bearer",),
