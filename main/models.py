@@ -1,5 +1,6 @@
+import contextlib
+import datetime
 import ipaddress
-import re
 import uuid
 import secrets
 import string
@@ -9,7 +10,7 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin,
 )
-from django.db import models, IntegrityError
+from django.db import models, IntegrityError, transaction
 from django.db.models.query import QuerySet
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -17,6 +18,7 @@ from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.contrib.auth.hashers import make_password
+from rest_framework.authtoken.models import Token
 
 from main.constants import BLACKLIST, CHANNELS, OS_CHOICES, REDIRECT_CHOICES, STATUS
 from main.validators import validate_name
@@ -120,10 +122,22 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
     def get_queryset(self) -> QuerySet:
+        queryset = super().get_queryset()
+
+        # Check if the user is a superuser
+        User = get_user_model()
+        if (
+            hasattr(User, "is_superuser")
+            and User.is_authenticated
+            and User.is_superuser
+        ):
+            return queryset
+
+        # Filter out soft-deleted users
         if hasattr(self.model, "is_deleted"):
-            return super().get_queryset().filter(is_deleted=False)
+            return queryset.filter(is_deleted=False, is_active=True)
         else:
-            return super().get_queryset()
+            return queryset.filter(is_active=True)
 
 
 class UserAccount(AbstractUser, PermissionsMixin, BaseModel):
@@ -160,6 +174,41 @@ class UserAccount(AbstractUser, PermissionsMixin, BaseModel):
 
     def __str__(self):
         return self.first_name
+
+
+class CustomToken(Token):
+    id = models.UUIDField(
+        _("ID"), default=uuid.uuid4, editable=False, unique=True, primary_key=True
+    )
+    expiry_date = models.DateTimeField(null=False, blank=False)
+    verified_on = models.DateTimeField(null=True, blank=True)
+
+    def create_expiry_date(self, created: datetime.datetime) -> datetime.datetime:
+        """
+        Creates an expiry date for the token.
+
+        Args:
+            created (datetime.datetime): The creation date of the token.
+
+        Returns:
+            datetime.datetime: The expiry date of the token.
+        """
+        return created + datetime.timedelta(days=3) if created else None
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            while True:
+                with contextlib.suppress(IntegrityError):
+                    with transaction.atomic():
+                        if not self.created:
+                            self.created = timezone.localtime()
+                        if not self.key:
+                            self.key = self.generate_key()
+                        self.expiry_date = self.create_expiry_date(self.created)
+                        super(Token, self).save(*args, **kwargs)
+                        break  # Exit the loop if the expiry is set successfully
+        else:
+            super(Token, self).save(*args, **kwargs)
 
 
 class Category(BaseModel):

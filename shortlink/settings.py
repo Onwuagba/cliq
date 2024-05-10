@@ -84,6 +84,27 @@ DATABASES = {
     },
 }
 
+# CELERY
+CELERY_BROKER_URL = "redis://" + os.getenv("REDIS_HOST") + ":" + os.getenv("REDIS_PORT")
+CELERY_RESULT_BACKEND = (
+    "redis://" + os.getenv("REDIS_HOST") + ":" + os.getenv("REDIS_PORT")
+)
+CELERY_TIMEZONE = "Africa/Lagos"
+# CELERY_BEAT_SCHEDULE = {
+#  'send-notification-every-10min': {
+#        'task': 'common.utilities.tasks.resend_welcome_email',
+#        'schedule': crontab(minute=0), # execute every hour
+#     },
+#  'flush-expired-tokens': {
+#        'task': 'common.utilities.tasks.flush_expired_tokens',
+#        'schedule': crontab(hour=1, minute=0), # 1 AM daily
+#     },
+#  'delete_empty_log_files': {
+#        'task': 'common.utilities.tasks.delete_empty_log_files',
+#        'schedule': crontab(hour=0, minute=30), # 12:30 AM daily
+#     }
+# }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

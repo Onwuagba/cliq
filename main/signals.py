@@ -1,10 +1,22 @@
+import logging
 from datetime import timedelta
 
 from django.db.models.signals import post_save
-from django.dispatch import receiver
+from django.dispatch import receiver, Signal
 from django.utils import timezone
+from django.contrib.sites.shortcuts import get_current_site
+from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
+from main.constants import email_sender
 
-from main.models import LinkReview, ShortLink, UserAccount, UserShortLink
+from main.models import LinkReview, ShortLink, UserAccount, CustomToken
+from main.models import CustomToken
+from main.constants import email_sender
+from main.tasks import send_email_confirmation_mail
+
+logger = logging.getLogger("app")
+user_created = Signal()
 
 
 @receiver(post_save, sender=LinkReview)
@@ -56,4 +68,47 @@ def set_expiration_for_anonymous_link(sender, instance: ShortLink, created, **kw
             # instance.expiration_date = expiration_date
             # instance.save(update_fields=["expiration_date"])
 
-            ShortLink.objects.filter(pk=instance.pk).update(expiration_date=expiry_in_30) # using this .update() cos the save method above triggers the signal again and only terminates cos of the 'if not created' check
+            ShortLink.objects.filter(pk=instance.pk).update(
+                expiration_date=expiry_in_30
+            )  # using this .update() cos the save method above triggers the signal again and only terminates cos of the 'if not created' check
+
+
+@receiver(user_created)
+def send_email_on_user_creation(
+    sender, instance: UserAccount, created, request, **kwargs
+):
+    if created:
+        email_content = {
+            "subject": "Halo 👋 Please confirm your account on ShortLink",
+            "sender": email_sender,
+            "recipient": instance.email,
+            "template": "verify-account.html",
+        }
+        try:
+            tokenModel = CustomToken()
+
+            token, new_obj = CustomToken.objects.get_or_create(
+                user=instance,
+            )
+
+            # obj is being updated.
+            # Called from regenerate email verification endpoint
+            if not new_obj:
+                token.created = timezone.localtime()
+                token.verified_on = None
+                token.expiry_date = tokenModel.create_expiry_date(token.created)
+                token.save()
+
+            uid = urlsafe_base64_encode(force_bytes(instance.pk))
+            domain = get_current_site(request).domain
+            confirm_url = reverse(
+                "main:confirm_email", kwargs={"uid": uid, "token": token}
+            )
+            confirm_url = f"{request.scheme}://{domain}{confirm_url}"
+
+            context = {"username": instance.first_name, "url": confirm_url}
+            print(context)
+            send_email_confirmation_mail.delay(email_content, context)
+        except Exception as e:
+            logger.error(f"Error sending welcome email to {instance.username}: {e}")
+            raise ValueError("An error occurred while sending the welcome email") from e
