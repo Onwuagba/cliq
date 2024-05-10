@@ -2,6 +2,7 @@ import datetime
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -74,9 +75,13 @@ WSGI_APPLICATION = "shortlink.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("SL_NAME"),
+        "USER": (os.getenv("SL_USER")),
+        "PASSWORD": (os.getenv("SL_PASSWORD")),
+        "HOST": os.getenv("SL_HOST"),
+        "PORT": os.getenv("SL_PORT", "5432"),
+    },
 }
 
 

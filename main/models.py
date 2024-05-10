@@ -11,10 +11,12 @@ from django.contrib.auth.models import (
 )
 from django.db import models, IntegrityError
 from django.db.models.query import QuerySet
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
+from django.contrib.auth.hashers import make_password
 
 from main.constants import BLACKLIST, CHANNELS, OS_CHOICES, REDIRECT_CHOICES, STATUS
 from main.validators import validate_name
@@ -24,6 +26,19 @@ def generate_shortcode(length=6):
     """Generate a random string of specified length."""
     characters = string.ascii_letters + string.digits
     return "".join(secrets.choice(characters) for _ in range(length))
+
+
+def validate_url(value):
+    url_validator = URLValidator()
+
+    try:
+        # Check if the URL has a scheme
+        if "://" not in value:
+            value = f"http://{value}"
+
+        url_validator(value)
+    except ValidationError as e:
+        raise ValidationError("Invalid URL") from e
 
 
 class BaseModel(models.Model):
@@ -49,12 +64,16 @@ class CustomAdminManager(BaseUserManager):
 
 class ShortLinkManager(models.Manager):
     def get_queryset(self):
-        if hasattr(self.model, "link_review"):  # reverse related to LinkReview model
-            queryset = (
-                super().get_queryset().filter(link_review__status__iexact="approved")
-            )
-        else:
-            queryset = super().get_queryset()
+        queryset = super().get_queryset()
+
+        # Check if the user is a superuser
+        User = get_user_model()
+        if (
+            hasattr(User, "is_superuser")
+            and User.is_authenticated
+            and User.is_superuser
+        ):
+            return queryset
 
         # Filter out expired links
         queryset = queryset.filter(
@@ -62,24 +81,31 @@ class ShortLinkManager(models.Manager):
             | models.Q(expiration_date__gte=timezone.now())
         )
 
+        if hasattr(self.model, "link_review"):  # reverse related to LinkReview model
+            qs = queryset.filter(link_review__status__iexact="approved")
+            queryset = qs if qs else queryset
+
+        # append utm tags to shortcode
+        # if hasattr(self.model, "link_utm"):
+        #     queryset = queryset.filter(link_utm__isnull=False)
+
         return queryset
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, username, password=None, **extra_fields):
-        if not email and not username:
-            raise ValueError("Email and username is required")
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("Email is required")
 
         user = self.model(
             email=self.normalize_email(email),
-            username=username,
             **extra_fields,
         )
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, username, password, **extra_fields):
+    def create_superuser(self, email, password, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
@@ -91,7 +117,7 @@ class UserManager(BaseUserManager):
             raise ValueError("Superuser must have is_staff=True.")
         if extra_fields.get("is_superuser") is not True:
             raise ValueError("Superuser must have is_superuser=True.")
-        return self.create_user(email, username, password, **extra_fields)
+        return self.create_user(email, password, **extra_fields)
 
     def get_queryset(self) -> QuerySet:
         if hasattr(self.model, "is_deleted"):
@@ -126,7 +152,8 @@ class UserAccount(AbstractUser, PermissionsMixin, BaseModel):
         help_text=_("Select channel from which the user was created."),
     )
 
-    REQUIRED_FIELDS = ["email", "first_name", "last_name"]
+    REQUIRED_FIELDS = ["first_name", "last_name"]
+    USERNAME_FIELD = "email"
 
     objects = UserManager()
     admin_objects = CustomAdminManager()  # manager for admin
@@ -137,6 +164,10 @@ class UserAccount(AbstractUser, PermissionsMixin, BaseModel):
 
 class Category(BaseModel):
     name = models.CharField(max_length=30, unique=True)
+
+    class Meta:
+        verbose_name = "category"
+        verbose_name_plural = "categories"
 
     def __str__(self):
         return self.name
@@ -158,18 +189,19 @@ class Blacklist(BaseModel):
             except ValueError:
                 raise ValidationError("Invalid IP address format.")
         elif self.blacklist_type == "domain":
-            URLValidator(
-                self.entry
-            )  # this raises a validationerror so no need to catch it again.
+            validate_url(self.entry)
 
 
 class ShortLink(BaseModel):
-    original_link = models.URLField(max_length=200, unique=True)
+    original_link = models.URLField(
+        max_length=200, unique=True, validators=[validate_url]
+    )
     shortcode = models.CharField(max_length=50, unique=True, blank=True, db_index=True)
     category = models.ForeignKey(
         Category,
         on_delete=models.CASCADE,
         null=True,
+        blank=True,
         related_name="link_category",
         db_index=True,
     )
@@ -185,7 +217,6 @@ class ShortLink(BaseModel):
     tags = models.CharField(
         max_length=100, null=True, blank=True, db_index=True
     )  # stores comma seperated tags
-    link_password = models.CharField(max_length=200, null=True, blank=True)
     ip_address = models.GenericIPAddressField(
         max_length=20, null=True, blank=True, protocol="IPv4"
     )
@@ -193,10 +224,17 @@ class ShortLink(BaseModel):
     objects = ShortLinkManager()
 
     def clean(self):
-        super().clean()
         if self.start_date and self.expiration_date:
             if self.start_date >= self.expiration_date:
                 raise ValidationError("Start date must be before the expiration date.")
+        elif self.start_date or self.expiration_date:
+            now = timezone.now()
+            if self.expiration_date <= now or self.start_date <= now:
+                raise ValidationError("Start/Expiration date cannot be in the past.")
+        super().clean()
+
+    def get_tags(self):
+        return self.tags.split(",") if self.tags else []
 
     def save(self, *args, **kwargs):
         if not self.shortcode:
@@ -206,6 +244,9 @@ class ShortLink(BaseModel):
                     super().save(*args, **kwargs)
                 except IntegrityError:
                     # Shortcode already exists, regenerate and try again
+                    continue
+                except Exception as e:
+                    print("Error saving link: %s" % e)
                     continue
                 else:
                     # Unique shortcode generated, break the loop and exit
@@ -222,15 +263,28 @@ class UserShortLink(BaseModel):
     user = models.ForeignKey(
         UserAccount, on_delete=models.CASCADE, related_name="user_link"
     )
-    link = models.ForeignKey(
+    link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_shortlink"
     )
     is_link_discoverable = models.BooleanField(default=False)
     is_link_masked = models.BooleanField(default=False)
     is_link_protected = models.BooleanField(default=False)
+    link_password = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.link.shortcode}"
+
+    def clean(self):
+        super().clean()
+        if self.is_link_protected and not self.link_password:
+            raise ValidationError("Password is required for protected links.")
+
+    def save(self, *args, **kwargs):
+        if self.link_password and not self.is_link_protected:
+            self.is_link_protected = True
+        if self._state.adding and self.link_password:
+            self.link_password = make_password(self.link_password)
+        super().save(*args, **kwargs)
 
 
 class LinkReview(BaseModel):
@@ -268,7 +322,10 @@ class LinkRedirect(BaseModel):
     link = models.ForeignKey(
         ShortLink, on_delete=models.CASCADE, related_name="link_redirect", db_index=True
     )
-    redirect_link = models.URLField(max_length=200)
+    redirect_link = models.URLField(
+        max_length=200,
+        validators=[validate_url],
+    )
     device_type = models.CharField(
         max_length=30, choices=OS_CHOICES, null=True, blank=True
     )
@@ -313,7 +370,10 @@ class LinkUTMParameter(BaseModel):
 
 
 class ReportLink(BaseModel):
-    short_link = models.URLField(max_length=200)
+    short_link = models.URLField(
+        max_length=200,
+        validators=[validate_url],
+    )
     card_description = models.TextField()
     attachment = models.ImageField(
         upload_to="uploads/reported_links/", null=True, blank=True
@@ -360,3 +420,6 @@ class Analytics(BaseModel):
     language = models.CharField(max_length=50, null=True, blank=True)
     user_agent = models.CharField(max_length=255, null=True, blank=True)
     referrer = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        verbose_name_plural = "analytics"
