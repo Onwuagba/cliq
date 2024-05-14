@@ -31,13 +31,10 @@ from main.serializers import (
     ConfirmEmailSerializer,
     CustomTokenSerializer,
     ForgotPasswordSerializer,
-    LoginWith2faTokenSerializer,
-    LoginWithLost2faDeviceTokenSerializer,
     LogoutSerializer,
     RegenerateEmailVerificationSerializer,
     RegistrationSerializer,
     ResetPasswordSerializer,
-    SocialSignUpSerializer,
 )
 from main.constants import admin_support_sender, email_sender
 from main.tasks import send_notif_email

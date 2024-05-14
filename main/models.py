@@ -177,9 +177,7 @@ class UserAccount(AbstractUser, PermissionsMixin, BaseModel):
 
 
 class CustomToken(Token):
-    id = models.UUIDField(
-        _("ID"), default=uuid.uuid4, editable=False, unique=True, primary_key=True
-    )
+    id = models.UUIDField(_("ID"), default=uuid.uuid4, editable=False, unique=True)
     expiry_date = models.DateTimeField(null=False, blank=False)
     verified_on = models.DateTimeField(null=True, blank=True)
 

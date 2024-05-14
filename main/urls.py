@@ -21,7 +21,7 @@ urlpatterns = [
     path("", Home.as_view()),
     path("signup/", RegisterAPIView.as_view(), name="signup"),
     path(
-        "confirm_email/<str:uid>/<str:token>",
+        "confirm_email/<str:uid>/<str:token>/",
         ConfirmEmailView.as_view(),
         name="confirm_email",
     ),
@@ -32,11 +32,10 @@ urlpatterns = [
         ChangePasswordView.as_view(),
         name="change_password",
     ),
-    path("delete_account", DeleteAccountView.as_view(), name="delete_account"),
+    path("delete_account/", DeleteAccountView.as_view(), name="delete_account"),
     path("login/", CustomTokenView.as_view(), name="token_obtain_pair"),
     path("refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("validate_token/", TokenVerifyView.as_view(), name="validate"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("reset_password/", ResetPasswordView.as_view(), name="reset_password"),
 ]
-

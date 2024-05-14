@@ -45,7 +45,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = get_user_model()
         exclude = [
-            "regToken",
             "is_deleted",
             "is_active",
             "last_login",
@@ -82,7 +81,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
         except Exception as e:
             raise serializers.ValidationError(str(e))
-        
+
         user_created.send(
             sender=self.Meta.model,
             instance=user,
@@ -355,4 +354,3 @@ class ResetPasswordSerializer(serializers.ModelSerializer):
 
 class LogoutSerializer(serializers.Serializer):
     refresh_token = serializers.CharField()
-
