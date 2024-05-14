@@ -10,8 +10,8 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from main.constants import email_sender
 
-from main.models import LinkReview, ShortLink, UserAccount, CustomToken
-from main.models import CustomToken
+from shorty.models import LinkReview, ShortLink
+from main.models import CustomToken, UserAccount
 from main.constants import email_sender
 from main.tasks import send_email_confirmation_mail
 

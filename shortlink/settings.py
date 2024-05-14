@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "main",
     "common",
+    "shorty",
 ]
 
 MIDDLEWARE = [
