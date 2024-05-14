@@ -85,6 +85,14 @@ DATABASES = {
     },
 }
 
+SWAGGER_SETTINGS = {
+    "DEFAULT_INFO": "shortlink.urls.openapi_info",
+    "SECURITY_DEFINITIONS": {
+        "Basic": {"type": "basic"},
+        "Bearer": {"type": "apiKey", "name": "Authorization", "in": "header"},
+    },
+}
+
 # CELERY
 CELERY_BROKER_URL = "redis://" + os.getenv("REDIS_HOST") + ":" + os.getenv("REDIS_PORT")
 CELERY_RESULT_BACKEND = (
@@ -180,7 +188,7 @@ LOGGING = {
 
 
 SIMPLE_JWT = {
-    "USER_ID_FIELD": "uid",
+    "USER_ID_FIELD": "id",
     "AUTH_HEADER_TYPES": ("Bearer",),
     "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=5),
     "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=1),
@@ -199,17 +207,27 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        # "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+        "common.helpers.AnonLinkCreationThrottle",  # rates defined here already
+        "common.helpers.UserLinkCreationThrottle",
     ],
-    "DEFAULT_THROTTLE_RATES": {"anon": "15/day", "user": "800/day"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "50/day",
+        "user": "800/day",
+    },
 }
 
 # Restrict Django admin access to specific IP addresses
 ALLOWED_ADMIN_IPS = os.getenv("SL_ALLOWED_ADMIN").split(",")
 
-
+LOGIN_URL = "/api/vi/auth/login/"
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 

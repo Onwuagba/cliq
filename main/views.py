@@ -24,6 +24,7 @@ from rest_framework_simplejwt import views as jwt_views
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from common.helpers import AnonLinkCreationThrottle, UserLinkCreationThrottle
 from common.utilities.api_response import CustomAPIResponse
 from common.utilities.generics import check_email_username
 from main.serializers import (
@@ -110,6 +111,16 @@ class ConfirmEmailView(UpdateAPIView):
         return token_obj
 
     def get_user(self, uid, token):
+        """
+        Validates the provided UID and token for user verification.
+        
+        Args:
+            uid (str): The unique identifier of the user.
+            token (str): The token for verification.
+        
+        Returns:
+            CustomToken: The custom token object for the given UID and token.
+        """
         if not all([uid, token]):
             raise ValidationError("Invalid confirmation link.")
 

@@ -1,0 +1,617 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "ShortLink API",
+        "description": "The URL Shortening API allows clients to generate short, customized URLs from long URLs. These short URLs are easier to share and manage, making them ideal for various applications such as social media, marketing campaigns, and analytics tracking.",
+        "termsOfService": "https://www.shortlink.com/policies/terms/",
+        "contact": {
+            "email": "contact@shortlink.com"
+        },
+        "license": {
+            "name": "BSD License"
+        },
+        "version": "v1"
+    },
+    "basePath": "/api/vi",
+    "consumes": [
+        "application/json"
+    ],
+    "produces": [
+        "application/json"
+    ],
+    "securityDefinitions": {
+        "Basic": {
+            "type": "basic"
+        }
+    },
+    "security": [
+        {
+            "Basic": []
+        }
+    ],
+    "paths": {
+        "/auth/": {
+            "get": {
+                "operationId": "auth_list",
+                "description": "",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/api/token/blacklist/": {
+            "post": {
+                "operationId": "auth_api_token_blacklist_create",
+                "description": "Takes a token and blacklists it. Must be used with the\n`rest_framework_simplejwt.token_blacklist` app installed.",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/TokenBlacklist"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/TokenBlacklist"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/confirm_email/{uid}/{token}/": {
+            "patch": {
+                "operationId": "auth_confirm_email_partial_update",
+                "description": "User confirms their emails after registration.",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ConfirmEmail"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ConfirmEmail"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "uid",
+                    "in": "path",
+                    "required": true,
+                    "type": "string"
+                },
+                {
+                    "name": "token",
+                    "in": "path",
+                    "required": true,
+                    "type": "string"
+                }
+            ]
+        },
+        "/auth/delete_account/": {
+            "delete": {
+                "operationId": "auth_delete_account_delete",
+                "description": "Deactivate account",
+                "parameters": [],
+                "responses": {
+                    "204": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/forgot_password/": {
+            "post": {
+                "operationId": "auth_forgot_password_create",
+                "description": "",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/forgot_password/update/{uid}/{token}/": {
+            "patch": {
+                "operationId": "auth_forgot_password_update_partial_update",
+                "description": "change password endpoint is called from the email clicking forgot password",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ChangePassword"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ChangePassword"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "uid",
+                    "in": "path",
+                    "required": true,
+                    "type": "string"
+                },
+                {
+                    "name": "token",
+                    "in": "path",
+                    "required": true,
+                    "type": "string"
+                }
+            ]
+        },
+        "/auth/login/": {
+            "post": {
+                "operationId": "auth_login_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CustomToken"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/CustomToken"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/logout/": {
+            "post": {
+                "operationId": "auth_logout_create",
+                "description": "",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/refresh/": {
+            "post": {
+                "operationId": "auth_refresh_create",
+                "description": "Takes a refresh type JSON web token and returns an access type JSON web\ntoken if the refresh token is valid.",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/TokenRefresh"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/TokenRefresh"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/regenerate_email/": {
+            "post": {
+                "operationId": "auth_regenerate_email_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/RegenerateEmailVerification"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/RegenerateEmailVerification"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/reset_password/": {
+            "patch": {
+                "operationId": "auth_reset_password_partial_update",
+                "summary": "Allow authenticated user to change password",
+                "description": "Accepts - password, confirm_password, old_password",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ResetPassword"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ResetPassword"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/signup/": {
+            "post": {
+                "operationId": "auth_signup_create",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Registration"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/Registration"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        },
+        "/auth/validate_token/": {
+            "post": {
+                "operationId": "auth_validate_token_create",
+                "description": "Takes a token and indicates if it is valid.  This view provides no\ninformation about a token's fitness for a particular use.",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/TokenVerify"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/TokenVerify"
+                        }
+                    }
+                },
+                "tags": [
+                    "auth"
+                ]
+            },
+            "parameters": []
+        }
+    },
+    "definitions": {
+        "TokenBlacklist": {
+            "required": [
+                "refresh"
+            ],
+            "type": "object",
+            "properties": {
+                "refresh": {
+                    "title": "Refresh",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "ConfirmEmail": {
+            "type": "object",
+            "properties": {}
+        },
+        "ChangePassword": {
+            "required": [
+                "new_password",
+                "confirm_password"
+            ],
+            "type": "object",
+            "properties": {
+                "new_password": {
+                    "title": "New password",
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 8
+                },
+                "confirm_password": {
+                    "title": "Confirm password",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "CustomToken": {
+            "required": [
+                "password"
+            ],
+            "type": "object",
+            "properties": {
+                "email": {
+                    "title": "Email",
+                    "type": "string",
+                    "format": "email",
+                    "minLength": 1
+                },
+                "password": {
+                    "title": "Password",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "TokenRefresh": {
+            "required": [
+                "refresh"
+            ],
+            "type": "object",
+            "properties": {
+                "refresh": {
+                    "title": "Refresh",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "access": {
+                    "title": "Access",
+                    "type": "string",
+                    "readOnly": true,
+                    "minLength": 1
+                }
+            }
+        },
+        "RegenerateEmailVerification": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "title": "Email",
+                    "type": "string",
+                    "format": "email",
+                    "minLength": 1
+                },
+                "username": {
+                    "title": "Username",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "ResetPassword": {
+            "required": [
+                "old_password",
+                "password",
+                "confirm_password"
+            ],
+            "type": "object",
+            "properties": {
+                "old_password": {
+                    "title": "Old password",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "password": {
+                    "title": "Password",
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 8
+                },
+                "confirm_password": {
+                    "title": "Confirm password",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "Registration": {
+            "required": [
+                "password",
+                "confirm_password",
+                "username",
+                "first_name",
+                "last_name",
+                "email"
+            ],
+            "type": "object",
+            "properties": {
+                "id": {
+                    "title": "Id",
+                    "type": "string",
+                    "format": "uuid",
+                    "readOnly": true
+                },
+                "password": {
+                    "title": "Password",
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 8
+                },
+                "confirm_password": {
+                    "title": "Confirm password",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "is_superuser": {
+                    "title": "Superuser status",
+                    "description": "Designates that this user has all permissions without explicitly assigning them.",
+                    "type": "boolean"
+                },
+                "username": {
+                    "title": "Username",
+                    "description": "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
+                    "type": "string",
+                    "pattern": "^[\\w.@+-]+$",
+                    "maxLength": 150,
+                    "minLength": 1
+                },
+                "is_staff": {
+                    "title": "Staff status",
+                    "description": "Designates whether the user can log into this admin site.",
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "title": "Created at",
+                    "type": "string",
+                    "format": "date-time",
+                    "readOnly": true
+                },
+                "updated_at": {
+                    "title": "Updated at",
+                    "type": "string",
+                    "format": "date-time",
+                    "readOnly": true
+                },
+                "first_name": {
+                    "title": "First name",
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1
+                },
+                "last_name": {
+                    "title": "Last name",
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1
+                },
+                "email": {
+                    "title": "Email",
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 255,
+                    "minLength": 1
+                },
+                "channel": {
+                    "title": "Channel",
+                    "description": "Select channel from which the user was created.",
+                    "type": "string",
+                    "enum": [
+                        "facebook",
+                        "twitter",
+                        "google",
+                        "email"
+                    ]
+                },
+                "groups": {
+                    "description": "The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                    "type": "array",
+                    "items": {
+                        "description": "The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        "type": "integer"
+                    },
+                    "uniqueItems": true
+                },
+                "user_permissions": {
+                    "description": "Specific permissions for this user.",
+                    "type": "array",
+                    "items": {
+                        "description": "Specific permissions for this user.",
+                        "type": "integer"
+                    },
+                    "uniqueItems": true
+                }
+            }
+        },
+        "TokenVerify": {
+            "required": [
+                "token"
+            ],
+            "type": "object",
+            "properties": {
+                "token": {
+                    "title": "Token",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        }
+    }
+}

@@ -21,17 +21,17 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-...
+openapi_info = openapi.Info(
+    title="ShortLink API",
+    default_version="v1",
+    description="The URL Shortening API allows clients to generate short, customized URLs from long URLs. These short URLs are easier to share and manage, making them ideal for various applications such as social media, marketing campaigns, and analytics tracking.",
+    terms_of_service="https://www.shortlink.com/policies/terms/",
+    contact=openapi.Contact(email="contact@shortlink.com"),
+    license=openapi.License(name="BSD License"),
+)
 
 schema_view = get_schema_view(
-    openapi.Info(
-        title="ShortLink API",
-        default_version="v1",
-        description="The URL Shortening API allows clients to generate short, customized URLs from long URLs. These short URLs are easier to share and manage, making them ideal for various applications such as social media, marketing campaigns, and analytics tracking.",
-        terms_of_service="https://www.shortlink.com/policies/terms/",
-        contact=openapi.Contact(email="contact@shortlink.com"),
-        license=openapi.License(name="BSD License"),
-    ),
+    openapi_info,
     public=True,
     permission_classes=(permissions.AllowAny,),
 )
