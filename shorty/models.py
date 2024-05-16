@@ -1,6 +1,7 @@
 import ipaddress
 import secrets
 import string
+import uuid
 
 from django.db import models, IntegrityError
 from django.contrib.auth import get_user_model
@@ -195,7 +196,7 @@ class UserShortLink(BaseModel):
 
 class LinkReview(BaseModel):
     # stores link info if user requests manual review of link that cannot be created due to blacklist entry
-    link = models.ForeignKey(
+    link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_review", db_index=True
     )
     status = models.CharField(
@@ -211,7 +212,7 @@ class LinkReview(BaseModel):
 
 
 class LinkCard(BaseModel):
-    link = models.ForeignKey(
+    link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_card"
     )
     card_title = models.CharField(max_length=60)
@@ -225,6 +226,7 @@ class LinkCard(BaseModel):
 
 
 class LinkRedirect(BaseModel):
+    # model to manage redirect rules specified by user. Could have different redirect rules based on certain configurations
     link = models.ForeignKey(
         ShortLink, on_delete=models.CASCADE, related_name="link_redirect", db_index=True
     )
@@ -276,6 +278,7 @@ class LinkUTMParameter(BaseModel):
 
 
 class ReportLink(BaseModel):
+    # option for anyone to report a link we shortened.
     short_link = models.URLField(
         max_length=200,
         validators=[validate_url],
@@ -291,6 +294,7 @@ class ReportLink(BaseModel):
 
 class QRCode(BaseModel):
     # save info for generating QR and generate the QR code on the fly
+    # link should have a qr=True attribute
     link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_qrcode"
     )
