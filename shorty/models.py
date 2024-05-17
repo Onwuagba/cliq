@@ -54,6 +54,11 @@ class ShortLinkManager(models.Manager):
             | models.Q(expiration_date__gte=timezone.now())
         )
 
+        # Remove deleted objects
+        if hasattr(self.model, "is_deleted"):
+            qs = queryset.filter(is_deleted=False)
+            queryset = qs if qs else queryset
+
         # Include UserShortLink objects if available
         if hasattr(self.model, "link_shortlink"):
             queryset = queryset.prefetch_related("link_shortlink")

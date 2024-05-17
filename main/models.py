@@ -43,6 +43,32 @@ def validate_url(value):
         raise ValidationError("Invalid URL") from e
 
 
+class BaseModelManager(models.Manager):
+    def get_queryset(self) -> QuerySet:
+        queryset = super().get_queryset()
+
+        # Check if the user is a superuser
+        User = get_user_model()
+        if (
+            hasattr(User, "is_superuser")
+            and User.is_authenticated
+            and User.is_superuser
+            # add check for user who are also admin
+        ):
+            return queryset
+
+        if hasattr(queryset.model, "is_deleted"):
+            return queryset.filter(is_deleted=False)
+        return queryset
+
+
+class CustomAdminManager(BaseUserManager):
+    """relevant for admin to still see soft-deleted users
+    that is hidden via the UserManager class."""
+
+    pass
+
+
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -53,6 +79,9 @@ class BaseModel(models.Model):
     )
     deleted_at = models.DateTimeField(null=True, blank=True)
 
+    objects = BaseModelManager()
+    admin = CustomAdminManager()
+
     def save(self, *args, **kwargs):
         if self.is_deleted:
             self.deleted_at = timezone.now()
@@ -61,13 +90,6 @@ class BaseModel(models.Model):
     class Meta:
         abstract = True
         ordering = ["-created_at", "-updated_at"]
-
-
-class CustomAdminManager(BaseUserManager):
-    """relevant for admin to still see soft-deleted users
-    that is hidden via the UserManager class."""
-
-    pass
 
 
 class UserManager(BaseUserManager):

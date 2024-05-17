@@ -41,11 +41,12 @@ urlpatterns = [
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"
     ),  # swagger.josn or swagger.yaml
     path(
-        "api/vi/doc/",
+        "api/v1/doc/",
         schema_view.with_ui("swagger", cache_timeout=0),
         name="shortlink_doc",
     ),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
-    path("api/vi/auth/", include("main.urls")),
+    path("api/v1/auth/", include("main.urls")),
+    path("api/v1/", include("shorty.urls")),
 ]
