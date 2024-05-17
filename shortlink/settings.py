@@ -115,6 +115,14 @@ CELERY_TIMEZONE = "Africa/Lagos"
 #     }
 # }
 
+# Email configuration
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS")
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -191,7 +199,8 @@ LOGGING = {
 SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "AUTH_HEADER_TYPES": ("Bearer",),
-    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=5),
+    # "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=5),
+    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=8000),  # development
     "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=1),
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "UPDATE_LAST_LOGIN": True,
@@ -234,7 +243,7 @@ LOGIN_URL = "/api/vi/auth/login/"
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Africa/Lagos"
 
 USE_I18N = True
 

@@ -501,7 +501,8 @@
                         generated. This action cannot be undone, and you will no longer have access to your account.
                       </p>
                       <p>If you believe this deletion request was made in error or if you have changed your mind, please
-                        contact our <b><a href="mailto:{{admin_email}}">support@shorty.com</a></b> within 7 days. After
+                        contact our <b><a href="mailto:{{admin_email}}">support@shorty.com</a></b> within
+                        {{quarantine_days}} days. After
                         this period, your data will be permanently archived from our systems. </p>
                       <p>We appreciate the time you spent with us and value your feedback. If there is anything you
                         would like to share about your experience with our platform, please feel free to reach out to
@@ -529,7 +530,7 @@
                   <td class="content-cell-footer" align="center">
                     <p class="f-fallback sub align-center" style="font-size: 10px;">
                       This email was sent to {{email}}
-                      <br> &copy; 2023 shorty. All rights reserved. <br> <b>shorty.com</b>
+                      <br> &copy; 2023 - {% now 'Y' %} shorty. All rights reserved. <br> <b>shorty.com</b>
 
                     </p>
                   </td>

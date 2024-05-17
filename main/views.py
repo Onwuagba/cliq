@@ -84,7 +84,7 @@ class RegisterAPIView(CreateAPIView):
                 status_msg = "failed"
         except Exception as e:
             logger.error(
-                f"Exception in registration. Email {request.data.get('email')}: str(e.args[0])"
+                f"Exception in registration. Email {request.data.get('email')}: {str(e.args[0])}"
             )
             message = e.args[0]
             status_code = status.HTTP_400_BAD_REQUEST
@@ -96,11 +96,15 @@ class RegisterAPIView(CreateAPIView):
 class ConfirmEmailView(UpdateAPIView):
     """
     User confirms their emails after registration.
+
+    -- User clicks button in email
+    -- GET request to retrieve email & other staff information with button to confirm email
+    -- PATCH request to do the main updating of is_active
     """
 
     permission_classes = (AllowAny,)
     serializer_class = ConfirmEmailSerializer
-    http_method_names = ["patch"]
+    http_method_names = ["get", "patch"]
 
     def get_object(self, uid, token):
         try:
@@ -113,11 +117,11 @@ class ConfirmEmailView(UpdateAPIView):
     def get_user(self, uid, token):
         """
         Validates the provided UID and token for user verification.
-        
+
         Args:
             uid (str): The unique identifier of the user.
             token (str): The token for verification.
-        
+
         Returns:
             CustomToken: The custom token object for the given UID and token.
         """
@@ -133,6 +137,9 @@ class ConfirmEmailView(UpdateAPIView):
                 "Invalid verification link. Unable to retrieve user information"
             )
 
+        if user.is_active:
+            raise ValidationError("Account already verified. Proceed to login")
+
         if (
             token_obj.expiry_date is not None
             and token_obj.expiry_date < timezone.localtime()
@@ -140,6 +147,28 @@ class ConfirmEmailView(UpdateAPIView):
             raise ValidationError("Confirmation link has expired")
 
         return token_obj
+
+    def get(self, request, **kwargs):
+        """
+        display user info for user to click confirm button
+        """
+        uid = kwargs.get("uid", None)
+        token = kwargs.get("token", None)
+
+        try:
+            obj = self.get_object(uid, token)
+            message = obj.user.email
+            status_msg = "success"
+            status_code = status.HTTP_200_OK
+        except Exception as e:
+            logger.error(
+                f"Exception in confirming email - {request.data.get('email')}: str(e.args[0])"
+            )
+            message = e.args[0]
+            status_msg = "failed"
+            status_code = status.HTTP_400_BAD_REQUEST
+
+        return CustomAPIResponse(message, status_code, status_msg).send()
 
     def patch(self, request, **kwargs):
         uid = kwargs.get("uid", None)
@@ -182,7 +211,7 @@ class ForgotPasswordView(APIView):
         reset_data = request.data
 
         try:
-            # check if email or username is in request
+            # check if email is in request
             check_email_username(reset_data)
 
             change_serializer = self.serializer_class(data=reset_data)
@@ -219,7 +248,7 @@ class ChangePasswordView(UpdateAPIView):
 
         uid = urlsafe_b64decode(uid).decode("utf-8")
         try:
-            user = UserModel.objects.get(uid=uid)
+            user = UserModel.objects.get(id=uid)
         except UserModel.DoesNotExist as e:
             raise ValidationError(
                 "No user found with user ID. "
@@ -305,19 +334,23 @@ class DeleteAccountView(APIView):
         """
         Deactivate account
         """
-        email = request.data.get("email")
         try:
-            check_email_username(request.data)
+            # check_email_username(request.data)
 
-            obj = self.get_object(request, email)
-            obj.is_deleted = True
-            obj.is_active = False
-            obj.save()
-            message = "Account deleted successfully. Data will be deleted after 30 days"
+            # obj = self.get_object(request, email)
+            user = request.user
+            uu = user.email.split("@")
+            user.email = f"deleted-{uu[0]}@{uu[1]}"
+            user.is_deleted = True
+            user.is_active = False
+            user.save()
+            message = (
+                "Account deleted successfully. Data will be displaced after 30 days"
+            )
             status_msg = "success"
             status_code = status.HTTP_200_OK
 
-            self.send_mail(obj)
+            self.send_mail(user)
         except (PermissionDenied, Exception) as e:
             logger.info(f"Exception in delete account: str(e.args[0])")
             message = e.args[0]
@@ -339,6 +372,9 @@ class DeleteAccountView(APIView):
         context = {
             "username": instance.first_name,
             "email": instance.email,
+            "quarantine_days": os.getenv(
+                "QUARANTINE_DAYS"
+            ),  # num of days to keep account
             "admin_email": admin_support_sender,
         }
         logger.info(f"context for email called from delete account endpoint: {context}")

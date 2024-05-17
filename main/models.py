@@ -51,6 +51,12 @@ class BaseModel(models.Model):
         default=False,
         help_text=_("Designates whether this entry has been deleted."),
     )
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.is_deleted:
+            self.deleted_at = timezone.now()
+        super().save(*args, **kwargs)
 
     class Meta:
         abstract = True
@@ -114,6 +120,7 @@ class UserAccount(AbstractUser, PermissionsMixin, BaseModel):
     id = models.UUIDField(
         default=uuid.uuid4, editable=False, unique=True, primary_key=True
     )
+    username = ""
     first_name = models.CharField(
         max_length=50, validators=[validate_name], null=False, blank=False
     )
@@ -177,4 +184,3 @@ class CustomToken(Token):
                         break  # Exit the loop if the expiry is set successfully
         else:
             super(Token, self).save(*args, **kwargs)
-

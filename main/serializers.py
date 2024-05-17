@@ -60,13 +60,12 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password")
-        email = validated_data.pop("email").lower()
         validated_data.pop("confirm_password", None)
 
         try:
             with transaction.atomic():
                 user, created = UserModel.objects.get_or_create(
-                    email__iexact=email, defaults=validated_data
+                    email__iexact=validated_data.get("email"), defaults=validated_data
                 )
                 if not created:
                     if user.is_active:
@@ -92,15 +91,20 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
 
 class ConfirmEmailSerializer(serializers.Serializer):
+
     def update(self, instance, validated_data):
         with transaction.atomic():
             try:
-                CustomToken.objects.filter(user=instance.user, key=instance.key).update(
-                    expiry_date=instance.created,
-                    verified_on=timezone.localtime(),
-                )
-                UserAccount.objects.filter(id=instance.user.id).update(is_active=True)
+                # Update the CustomToken instance
+                instance.expiry_date = instance.created
+                instance.verified_on = timezone.localtime()
+                instance.save(update_fields=["expiry_date", "verified_on"])
 
+                # Update the associated user account
+                instance.user.is_active = True
+                instance.user.save(update_fields=["is_active"])
+
+                # Send the welcome email
                 self.welcome_mail(instance)
             except Exception as e:
                 transaction.set_rollback(True)
@@ -124,7 +128,7 @@ class ConfirmEmailSerializer(serializers.Serializer):
             "email": instance.user.email,
             "url": url,
         }
-        logger.info(f"context for publisher welcome email to be sent: {context}")
+        logger.info(f"context for welcome email to be sent: {context}")
 
         # call celery
         send_notif_email.delay(email_content, context)
@@ -146,7 +150,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
     def create_token_send_email(self, request, *args):
         user = self.validated_data
         token = default_token_generator.make_token(user)
-        uid = urlsafe_b64encode(bytes(str(user.uid), "utf-8")).decode("utf-8")
+        uid = urlsafe_b64encode(bytes(str(user.id), "utf-8")).decode("utf-8")
 
         email_content = {
             "subject": "Reset password verification",

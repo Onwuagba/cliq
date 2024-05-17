@@ -12,6 +12,7 @@ def send_mail_now(content: dict, context: dict):
     """
     Accept email content as well as context to be passed to the template
     """
+    print("Sending mail")
     check_headers = checkMailHeaders(content)
     if not check_headers:
         subject = content["subject"]
@@ -19,17 +20,21 @@ def send_mail_now(content: dict, context: dict):
         recipient = content["recipient"]
         message = render_to_string(content["template"], context)
         plain_message = strip_tags(message)
-        email = send_mail(
-            subject,
-            message=plain_message,
-            from_email=sender,
-            recipient_list=[recipient],
-            fail_silently=False,
-            html_message=message,
-        )
-        # msg = email.send()
-        print(email)
-        return ("Mail sent successfully", True) if email == 1 else ("Failed", False)
+        try:
+            email = send_mail(
+                subject,
+                message=plain_message,
+                from_email=sender,
+                recipient_list=[recipient],
+                fail_silently=False,
+                html_message=message,
+            )
+            # msg = email.send()
+            print(email)
+            return ("Mail sent successfully", True) if email == 1 else ("Failed", False)
+        except Exception as e:
+            logger.error(f"Error in send_mail_now function: {str(e)}")
+            return "_", False
     logger.error(check_headers)
     return check_headers, False
 

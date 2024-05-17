@@ -22,6 +22,7 @@ class CustomAdmin(UserAdmin):
         "email",
         "channel",
         "is_active",
+        "is_deleted",
         "created_at",
         "updated_at",
     )
@@ -97,4 +98,3 @@ class CustomAdmin(UserAdmin):
         if not request.user.is_superuser:
             qs = qs.filter(is_superuser=False)
         return qs
-

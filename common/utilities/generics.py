@@ -16,4 +16,4 @@ def check_email_username(data):
     - None
     """
     if not {"username", "email"}.intersection(map(str.lower, data.keys())):
-        raise ValidationError("Email or Username is required")
+        raise ValidationError("Email is required")
