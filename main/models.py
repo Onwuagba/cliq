@@ -47,16 +47,6 @@ class BaseModelManager(models.Manager):
     def get_queryset(self) -> QuerySet:
         queryset = super().get_queryset()
 
-        # Check if the user is a superuser
-        User = get_user_model()
-        if (
-            hasattr(User, "is_superuser")
-            and User.is_authenticated
-            and User.is_superuser
-            # add check for user who are also admin
-        ):
-            return queryset
-
         if hasattr(queryset.model, "is_deleted"):
             return queryset.filter(is_deleted=False)
         return queryset
@@ -73,16 +63,16 @@ class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(
-        _("Deactivate Account"),
         default=False,
         help_text=_("Designates whether this entry has been deleted."),
     )
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     objects = BaseModelManager()
-    admin = CustomAdminManager()
+    admin_objects = CustomAdminManager()
 
     def save(self, *args, **kwargs):
+        self.full_clean()
         if self.is_deleted:
             self.deleted_at = timezone.now()
         super().save(*args, **kwargs)

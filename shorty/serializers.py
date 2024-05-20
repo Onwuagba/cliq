@@ -70,7 +70,13 @@ class LinkUTMParameterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LinkUTMParameter
-        fields = "__all__"
+        fields = (
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_term",
+            "utm_content",
+        )
 
 
 class ReportLinkSerializer(serializers.ModelSerializer):
@@ -95,15 +101,16 @@ class AnalyticsSerializer(serializers.ModelSerializer):
 
 
 class ShortLinkSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name")
     is_link_discoverable = serializers.BooleanField(
         default=False,
         source="link_shortlink.is_link_discoverable",
     )
     is_link_masked = serializers.BooleanField(
-        default=False, source="link_shortlink.is_link_discoverable"
+        default=False, source="link_shortlink.is_link_masked"
     )
     is_link_protected = serializers.BooleanField(
-        default=False, source="link_shortlink.is_link_discoverable"
+        default=False, source="link_shortlink.is_link_protected"
     )
     link_password = serializers.CharField(
         write_only=True, source="link_shortlink.link_password", required=False
@@ -118,6 +125,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             "original_link",
             "shortcode",
             "category",
+            "category_name",
             "start_date",
             "expiration_date",
             "get_tags",
@@ -130,40 +138,3 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             "link_utm",
             "link_redirect",
         )
-
-
-# class ShortLinkSerializer(serializers.ModelSerializer):
-#     user_shortlink = UserShortLinkSerializer()
-#     link_card = serializers.ListField(child=LinkCardSerializer(), required=False)
-
-#     class Meta:
-#         model = ShortLink
-#         fields = (
-#             "original_link",
-#             "shortcode",
-#             "category",
-#             "start_date",
-#             "expiration_date",
-#             "get_tags",
-#             "ip_address",
-#             "user_shortlink",
-#             "link_card",
-#         )
-
-#     def to_representation(self, instance):
-#         representation = super().to_representation(instance)
-
-#         if hasattr(instance, "link_shortlink") and instance.link_shortlink:
-#             user_shortlink = instance.link_shortlink
-#             representation["user_shortlink"] = {
-#                 "id": user_shortlink.id,
-#                 "user_id": user_shortlink.user.id,
-#                 "is_link_discoverable": user_shortlink.is_link_discoverable,
-#                 "is_link_masked": user_shortlink.is_link_masked,
-#                 "is_link_protected": user_shortlink.is_link_protected,
-#                 "link_password": user_shortlink.link_password,
-#             }
-#         else:
-#             representation["user_shortlink"] = {}
-
-#         return representation

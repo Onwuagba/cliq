@@ -5,7 +5,7 @@ from main.models import UserAccount
 
 class DefaultAdmin(admin.ModelAdmin):
     ordering = ("-updated_at",)
-    list_display = ("created_at", "updated_at")
+    list_display = ("is_deleted", "created_at", "updated_at", "deleted_at")
 
     def get_queryset(self, request):
         if request.user.is_superuser and hasattr(self.model, "admin_objects"):
@@ -16,6 +16,7 @@ class DefaultAdmin(admin.ModelAdmin):
 
 @admin.register(UserAccount)
 class CustomAdmin(UserAdmin):
+    search_fields = ("first_name", "last_name", "email")
     list_display = (
         "first_name",
         "last_name",

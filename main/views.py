@@ -203,7 +203,7 @@ class ForgotPasswordView(APIView):
     def post(self, request, **kwargs):
         """
         Params:
-        - Email/Username
+        - Email
 
         Returns:
         - A JSON response containing a message and status.
@@ -383,7 +383,7 @@ class DeleteAccountView(APIView):
         send_notif_email.delay(email_content, context)
 
 
-# customise JWT login payload to accept username or email
+# customise JWT login payload to accept email
 class CustomTokenView(jwt_views.TokenObtainPairView):
     serializer_class = CustomTokenSerializer
     token_obtain_pair = jwt_views.TokenObtainPairView.as_view()

@@ -4,7 +4,6 @@ import string
 import uuid
 
 from django.db import models, IntegrityError
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
@@ -13,7 +12,6 @@ from django.contrib.auth.hashers import make_password
 
 from main.constants import BLACKLIST, OS_CHOICES, REDIRECT_CHOICES, STATUS
 from main.models import BaseModel, UserAccount
-from main.validators import validate_name
 
 
 def generate_shortcode(length=6):
@@ -40,13 +38,13 @@ class ShortLinkManager(models.Manager):
         queryset = super().get_queryset()
 
         # Check if the user is a superuser
-        User = get_user_model()
-        if (
-            hasattr(User, "is_superuser")
-            and User.is_authenticated
-            and User.is_superuser
-        ):
-            return queryset
+        # User = get_user_model()
+        # if (
+        #     hasattr(User, "is_superuser")
+        #     and User.is_authenticated
+        #     and User.is_superuser
+        # ):
+        #     return queryset
 
         # Filter out expired links
         queryset = queryset.filter(
@@ -55,21 +53,20 @@ class ShortLinkManager(models.Manager):
         )
 
         # Remove deleted objects
-        if hasattr(self.model, "is_deleted"):
-            qs = queryset.filter(is_deleted=False)
-            queryset = qs if qs else queryset
+        queryset = queryset.filter(is_deleted=False)
 
-        # Include UserShortLink objects if available
-        if hasattr(self.model, "link_shortlink"):
-            queryset = queryset.prefetch_related("link_shortlink")
+        # Prefetch related UserShortLink objects if available
+        queryset = queryset.prefetch_related("link_shortlink")
 
-        if hasattr(self.model, "link_review"):  # reverse related to LinkReview model
-            qs = queryset.filter(link_review__status__iexact="approved")
-            queryset = qs if qs else queryset
-
-        # append utm tags to shortcode
-        # if hasattr(self.model, "link_utm"):
-        #     queryset = queryset.filter(link_utm__isnull=False)
+        # Filter objects with link_review status "approved"
+        queryset = queryset.exclude(
+            id__in=[
+                obj.id
+                for obj in queryset
+                if hasattr(obj, "link_review")
+                and obj.link_review.status.lower() != "approved"
+            ]
+        )
 
         return queryset
 
@@ -133,22 +130,24 @@ class ShortLink(BaseModel):
         max_length=20, null=True, blank=True, protocol="IPv4"
     )
 
-    objects = ShortLinkManager()
+    custom_objects = ShortLinkManager()
 
     def clean(self):
+        now = timezone.now()
         if self.start_date and self.expiration_date:
             if self.start_date >= self.expiration_date:
                 raise ValidationError("Start date must be before the expiration date.")
-        elif self.start_date or self.expiration_date:
-            now = timezone.now()
-            if self.expiration_date <= now or self.start_date <= now:
-                raise ValidationError("Start/Expiration date cannot be in the past.")
+        elif self.start_date and self.start_date <= now:
+            raise ValidationError("Start date cannot be in the past.")
+        elif self.expiration_date and self.expiration_date <= now:
+            raise ValidationError("Expiration date cannot be in the past.")
         super().clean()
 
     def get_tags(self):
-        return self.tags.split(",") if self.tags else []
+        return [tag.strip() for tag in self.tags.split(",")] if self.tags else []
 
     def save(self, *args, **kwargs):
+        self.full_clean()
         if not self.shortcode:
             while True:
                 self.shortcode = generate_shortcode()
@@ -173,8 +172,15 @@ class ShortLink(BaseModel):
 class UserShortLink(BaseModel):
     # Model to store link info for authenticated users. Seperate from the link table cos the link table may also contain info for users not registered
     user = models.ForeignKey(
-        UserAccount, on_delete=models.CASCADE, related_name="user_link"
+        UserAccount,
+        on_delete=models.CASCADE,
+        related_name="user_link",
+        null=True,
+        blank=True,
     )
+    session_id = models.UUIDField(
+        editable=False, unique=True, null=True, blank=True
+    )  # store session id for non authenticated users
     link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_shortlink"
     )
@@ -184,18 +190,25 @@ class UserShortLink(BaseModel):
     link_password = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.link.shortcode}"
+        return f"{self.user} - {self.link.shortcode}"
 
     def clean(self):
         super().clean()
         if self.is_link_protected and not self.link_password:
             raise ValidationError("Password is required for protected links.")
 
+        if not self.user and not self.session_id:
+            raise ValidationError("User or sessionID is required.")
+
     def save(self, *args, **kwargs):
+        self.full_clean()
         if self.link_password and not self.is_link_protected:
             self.is_link_protected = True
-        if self._state.adding and self.link_password:
-            self.link_password = make_password(self.link_password)
+        if self._state.adding:
+            if self.link_password:
+                self.link_password = make_password(self.link_password)
+            if not self.user and not self.session_id:
+                self.session_id = uuid.uuid4()
         super().save(*args, **kwargs)
 
 
@@ -265,7 +278,9 @@ class LinkUTMParameter(BaseModel):
     utm_term = models.CharField(max_length=100, null=True, blank=True)
     utm_content = models.CharField(max_length=100, null=True, blank=True)
 
-    def save(self, *args, **kwargs):
+    
+    def clean(self):
+        super().clean()
         if not any(
             [
                 self.utm_source,
@@ -276,7 +291,6 @@ class LinkUTMParameter(BaseModel):
             ]
         ):
             raise ValidationError("At least one UTM parameter is required.")
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"UTM param: {self.link.shortcode}"

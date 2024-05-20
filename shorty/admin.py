@@ -38,7 +38,6 @@ class ShortLinkAdmin(DefaultAdmin):
         "start_date",
         "expiration_date",
         "tags",
-        "link_password",
         "ip_address",
         "is_link_discoverable",
         "is_link_masked",
@@ -82,15 +81,11 @@ class ShortLinkAdmin(DefaultAdmin):
             return obj.link_shortlink.is_link_protected
         return None
 
-    def link_password(self, obj):
-        if hasattr(obj, "link_shortlink"):
-            return obj.link_shortlink.link_password
-        return None
-
 
 class UserShortLinkAdmin(DefaultAdmin):
     list_display = (
         "user",
+        "session_id",
         "link",
         "is_link_discoverable",
         "is_link_masked",
@@ -109,7 +104,7 @@ class UserShortLinkAdmin(DefaultAdmin):
         "is_link_masked",
         "is_link_protected",
     )
-    readonly_fields = ("link_password",)
+    # readonly_fields = ("link_password",)
 
 
 class LinkReviewAdmin(DefaultAdmin):

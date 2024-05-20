@@ -137,7 +137,6 @@ class ConfirmEmailSerializer(serializers.Serializer):
 
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False)
-    username = serializers.CharField(required=False)
 
     def validate(self, data):
         try:
@@ -217,8 +216,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class RegenerateEmailVerificationSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=False)
-    username = serializers.CharField(required=False)
+    email = serializers.EmailField(required=True)
 
     def validate(self, data):
         try:
