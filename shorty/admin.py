@@ -112,8 +112,14 @@ class LinkReviewAdmin(DefaultAdmin):
         "link",
         "status",
         "ip_address",
+        "reason",
     ) + DefaultAdmin.list_display
-    search_fields = ("link__original_link", "link__shortcode", "ip_address")
+    search_fields = (
+        "link__original_link",
+        "link__shortcode",
+        "ip_address",
+        "reason",
+    ) + DefaultAdmin.search_fields
     list_filter = ("status",)
 
 

@@ -223,10 +223,17 @@ class LinkReview(BaseModel):
     ip_address = models.GenericIPAddressField(
         max_length=20, null=True, blank=True
     )  # ip of user making request
+    reason = models.TextField(null=True, blank=True)
 
     # signal is triggered whenever status changes
     def __str__(self):
         return f"Review: {self.link.shortcode}"
+
+    def save(self, *args, **kwargs):
+        if self.status == "declined" and not self.reason:
+            raise ValueError("Please add a reason for the review")
+
+        super().save(*args, **kwargs)
 
 
 class LinkCard(BaseModel):
@@ -278,7 +285,6 @@ class LinkUTMParameter(BaseModel):
     utm_term = models.CharField(max_length=100, null=True, blank=True)
     utm_content = models.CharField(max_length=100, null=True, blank=True)
 
-    
     def clean(self):
         super().clean()
         if not any(

@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 from django.db.models.signals import post_save
+from django.contrib.sites.models import Site
 from django.dispatch import receiver, Signal
 from django.utils import timezone
 from django.contrib.sites.shortcuts import get_current_site
@@ -13,7 +14,7 @@ from main.constants import email_sender
 from shorty.models import LinkReview, ShortLink
 from main.models import CustomToken, UserAccount
 from main.constants import email_sender
-from main.tasks import send_email_confirmation_mail
+from main.tasks import send_email_confirmation_mail, send_notif_email
 
 logger = logging.getLogger("app")
 user_created = Signal()
@@ -34,9 +35,36 @@ def handle_link_review_status_change(sender, instance: LinkReview, created, **kw
     """
     if not created:
         print("Post save signal called cos link status changed")
-        if instance.status in ["approved", "declined"]:
-            # Send email to the user (instance.link.user.email)
-            pass
+        if str(instance.status).lower() in ["approved", "declined"] and hasattr(
+            instance.link, "link_shortlink"
+        ):
+            # Send email to the user
+            domain = Site.objects.get_current().domain
+            url = f"https://{domain}/{instance.link.shortcode}"
+            email_content = {
+                "subject": f"Your link submission has been {instance.status}",
+                "sender": email_sender,
+                "recipient": instance.link.link_shortlink.user.email,
+                "template": "link_review.html",
+            }
+            try:
+                context = {
+                    "username": instance.link.link_shortlink.user.first_name,
+                    "original_url": instance.link.original_link,
+                    "short_link": url,
+                    "status": instance.status,
+                    "reason": instance.reason,
+                    "created_at": instance.link.created_at,
+                }
+                print(context)
+                send_notif_email.delay(email_content, context)
+            except Exception as e:
+                logger.error(
+                    f"Error sending status update email to {instance.link.link_shortlink.user.email}: {e}"
+                )
+                raise ValueError(
+                    "An error occurred while sending the link review email"
+                ) from e
 
 
 @receiver(post_save, sender=ShortLink)
