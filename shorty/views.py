@@ -131,8 +131,22 @@ class ShortLinkView(ListAPIView):
         )
 
     def get(self, request):
-        # endpoint to get links created by user (token or via param)
-        # For param: ?session_id=
+        """
+        endpoint to get links created by user (token or via param)
+        For param: ?session_id=<user_id>
+
+        Return the list of ShortLink objects created by the user
+        If the user is authenticated, the endpoint will return links
+        created by the user. If the user is not authenticated,
+        the endpoint will check for session_id parameter in the
+        request query parameters. If session_id is provided, the
+        endpoint will return links created by the user specified
+        by the session_id.
+
+        :return: CustomAPIResponse object containing the list of
+                    ShortLink objects or an error message if
+                    something went wrong.
+        """
         status_code = status.HTTP_400_BAD_REQUEST
         status_msg = "failed"
 
@@ -160,6 +174,6 @@ class ShortLinkView(ListAPIView):
                 message = "No links created yet"
         except Exception as e:
             logger.error(f"Exception in ShortLinkView: {str(e.args[0])}")
-            message = e.args[0]
+            message = str(e.args[0])
 
         return CustomAPIResponse(message, status_code, status_msg).send()
