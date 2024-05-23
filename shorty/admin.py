@@ -59,11 +59,13 @@ class ShortLinkAdmin(DefaultAdmin):
         "link_shortlink__is_link_protected",
     )
 
-    readonly_fields = ("shortcode",)
+    readonly_fields = ("shortcode", "ip_address")
 
     def user(self, obj):
-        if hasattr(obj, "link_shortlink"):
+        if obj.link_shortlink and obj.link_shortlink.user:
             return obj.link_shortlink.user.email
+        elif obj.link_shortlink and obj.link_shortlink.session_id:
+            return obj.link_shortlink.session_id
         return None
 
     def is_link_discoverable(self, obj):
@@ -90,7 +92,6 @@ class UserShortLinkAdmin(DefaultAdmin):
         "is_link_discoverable",
         "is_link_masked",
         "is_link_protected",
-        "link_password",
     ) + DefaultAdmin.list_display
     search_fields = (
         "link__original_link",
@@ -104,20 +105,18 @@ class UserShortLinkAdmin(DefaultAdmin):
         "is_link_masked",
         "is_link_protected",
     )
-    # readonly_fields = ("link_password",)
+    readonly_fields = ("link_password", "session_id")
 
 
 class LinkReviewAdmin(DefaultAdmin):
     list_display = (
         "link",
         "status",
-        "ip_address",
         "reason",
     ) + DefaultAdmin.list_display
     search_fields = (
         "link__original_link",
         "link__shortcode",
-        "ip_address",
         "reason",
     ) + DefaultAdmin.search_fields
     list_filter = ("status",)

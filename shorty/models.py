@@ -37,15 +37,6 @@ class ShortLinkManager(models.Manager):
     def get_queryset(self):
         queryset = super().get_queryset()
 
-        # Check if the user is a superuser
-        # User = get_user_model()
-        # if (
-        #     hasattr(User, "is_superuser")
-        #     and User.is_authenticated
-        #     and User.is_superuser
-        # ):
-        #     return queryset
-
         # Filter out expired links
         queryset = queryset.filter(
             models.Q(expiration_date__isnull=True)
@@ -126,9 +117,7 @@ class ShortLink(BaseModel):
     tags = models.CharField(
         max_length=100, null=True, blank=True, db_index=True
     )  # stores comma seperated tags
-    ip_address = models.GenericIPAddressField(
-        max_length=20, null=True, blank=True, protocol="IPv4"
-    )
+    ip_address = models.GenericIPAddressField(max_length=20, protocol="IPv4")
 
     custom_objects = ShortLinkManager()
 
@@ -197,9 +186,6 @@ class UserShortLink(BaseModel):
         if self.is_link_protected and not self.link_password:
             raise ValidationError("Password is required for protected links.")
 
-        if not self.user and not self.session_id:
-            raise ValidationError("User or sessionID is required.")
-
     def save(self, *args, **kwargs):
         self.full_clean()
         if self.link_password and not self.is_link_protected:
@@ -220,10 +206,7 @@ class LinkReview(BaseModel):
     status = models.CharField(
         choices=STATUS, max_length=10, default="pending", db_index=True
     )
-    ip_address = models.GenericIPAddressField(
-        max_length=20, null=True, blank=True
-    )  # ip of user making request
-    reason = models.TextField(null=True, blank=True)
+    reason = models.TextField(null=True, blank=True)  # needed for declined review
 
     # signal is triggered whenever status changes
     def __str__(self):

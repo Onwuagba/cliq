@@ -1,18 +1,29 @@
+from datetime import timedelta
 import logging
+import os
 import uuid
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.utils import timezone
 from dotenv import load_dotenv
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status, filters
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.exceptions import PermissionDenied
 
 from common.permissions import IsAdmin
 from common.utilities.api_response import CustomAPIResponse
 from shorty.models import Category, ShortLink, UserShortLink
 from shorty.serializers import CategorySerializer, ShortLinkSerializer
+from shorty.utils import (
+    contains_blacklisted_texts,
+    get_user_ip,
+    is_domain_blacklisted,
+    is_ip_blacklisted,
+)
 
 logger = logging.getLogger("app")
 UserModel = get_user_model()
@@ -97,6 +108,7 @@ class ShortLinkView(ListAPIView):
     )  # allow any cos non-registered user can also create link
     serializer_class = ShortLinkSerializer
     http_method_names = ["get", "post"]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)
     filterset_fields = [
         "start_date",
@@ -159,7 +171,9 @@ class ShortLinkView(ListAPIView):
 
             if not user:
                 return CustomAPIResponse(
-                    "unauthorised access", status_code, status_msg
+                    "No shortened links found for you",
+                    status_code,
+                    status_msg,
                 ).send()
 
             queryset = self.filter_queryset(self.get_queryset(user))
@@ -175,5 +189,64 @@ class ShortLinkView(ListAPIView):
         except Exception as e:
             logger.error(f"Exception in ShortLinkView: {str(e.args[0])}")
             message = str(e.args[0])
+
+        return CustomAPIResponse(message, status_code, status_msg).send()
+
+    def post(self, request, **kwargs):
+        """
+        create new KPI (goal)
+        """
+        status_code = status.HTTP_400_BAD_REQUEST
+        status_msg = "failed"
+
+        try:
+            data = request.data
+            user_ip = get_user_ip(request)
+
+            if "original_link" not in data:
+                raise Exception("original_link is required")
+
+            original_link = data["original_link"]
+
+            if not original_link.startswith(("http://", "https://")):
+                data["original_link"] = "http://" + original_link
+
+            if is_domain_blacklisted(original_link) or contains_blacklisted_texts(
+                original_link
+            ):
+                raise Exception("Link not allowed. Please request a manual review.")
+
+            if is_ip_blacklisted(user_ip):
+                raise PermissionDenied("Request not permitted")
+
+            data["ip_address"] = user_ip
+
+            if request.user.is_authenticated:
+                data["user"] = str(request.user.id)
+            else:
+                # user is not authenticated so set expiration time for link
+                data["expiration_date"] = timezone.now() + timedelta(
+                    days=int(os.getenv("DEFAULT_EXPIRATION_DAYS"))
+                )
+
+            serializer = self.serializer_class(data=data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            message = {
+                "shortcode": serializer.data["shortcode"],
+                "original_link": serializer.data["original_link"],
+                "full_url": "TRUE",
+            }
+            status_msg = "success"
+            status_code = status.HTTP_201_CREATED
+        except (PermissionDenied, Exception) as e:
+            logger.error(f"POST Exception in ShortLinkView: {str(e.args[0])}")
+            message = str(e.args[0])
+            status_code = (
+                status.HTTP_403_FORBIDDEN
+                if isinstance(e, PermissionDenied)
+                else status_code
+            )
 
         return CustomAPIResponse(message, status_code, status_msg).send()

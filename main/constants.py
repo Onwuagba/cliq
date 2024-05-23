@@ -16,7 +16,7 @@ CHANNELS = (
 
 BLACKLIST = (
     ("ip", "ip"),
-    ("domain_name", "domain_name"),
+    ("domain", "domain"),
     ("text", "text"),
 )
 
