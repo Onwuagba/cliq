@@ -54,6 +54,7 @@ class ShortLinkAdmin(DefaultAdmin):
     list_filter = (
         "start_date",
         "expiration_date",
+        "is_deleted",
         "link_shortlink__is_link_discoverable",
         "link_shortlink__is_link_masked",
         "link_shortlink__is_link_protected",

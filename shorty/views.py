@@ -194,7 +194,7 @@ class ShortLinkView(ListAPIView):
 
     def post(self, request, **kwargs):
         """
-        create new KPI (goal)
+        create new shortlink
         """
         status_code = status.HTTP_400_BAD_REQUEST
         status_msg = "failed"
@@ -210,6 +210,9 @@ class ShortLinkView(ListAPIView):
 
             if not original_link.startswith(("http://", "https://")):
                 data["original_link"] = "http://" + original_link
+
+            if data.get("link_redirect"):
+                data["link_redirect"] = self._update_urls(data["link_redirect"])
 
             if is_domain_blacklisted(original_link) or contains_blacklisted_texts(
                 original_link
@@ -250,3 +253,24 @@ class ShortLinkView(ListAPIView):
             )
 
         return CustomAPIResponse(message, status_code, status_msg).send()
+
+    def _update_urls(self, links_redirect):
+        """
+        Update urls in redirect links to ensure they start with http:// or https://
+
+        Args:
+            links_redirect (list): List of link dictionaries
+
+        Returns:
+            list: List of link dictionaries with urls updated
+        """
+        updated_links_redirect = []
+        for link_dict in links_redirect:
+            if "redirect_link" in link_dict and not link_dict[
+                "redirect_link"
+            ].startswith(("http://", "https://")):
+                link_dict["redirect_link"] = f"http://{link_dict['redirect_link']}"
+
+            updated_links_redirect.append(link_dict)
+
+        return updated_links_redirect

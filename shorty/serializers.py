@@ -56,24 +56,42 @@ class LinkReviewSerializer(serializers.ModelSerializer):
 
 
 class LinkCardSerializer(serializers.ModelSerializer):
+    link = serializers.PrimaryKeyRelatedField(
+        queryset=ShortLink.objects.all(), required=False
+    )
 
     class Meta:
         model = LinkCard
-        fields = "__all__"
+        fields = ["card_title", "card_description", "card_thumbnail", "link"]
 
 
 class LinkRedirectSerializer(serializers.ModelSerializer):
+    link = serializers.PrimaryKeyRelatedField(
+        queryset=ShortLink.objects.all(), required=False
+    )
 
     class Meta:
         model = LinkRedirect
-        fields = "__all__"
+        fields = [
+            "link",
+            "redirect_link",
+            "device_type",
+            "time_of_day",
+            "country",
+            "language",
+            "redirect_rule",
+        ]
 
 
 class LinkUTMParameterSerializer(serializers.ModelSerializer):
+    link = serializers.PrimaryKeyRelatedField(
+        queryset=ShortLink.objects.all(), required=False
+    )
 
     class Meta:
         model = LinkUTMParameter
         fields = (
+            "link",
             "utm_source",
             "utm_medium",
             "utm_campaign",
@@ -105,6 +123,7 @@ class AnalyticsSerializer(serializers.ModelSerializer):
 
 class ShortLinkSerializer(serializers.ModelSerializer):
     ip_address = serializers.IPAddressField(write_only=True)
+    tags = serializers.CharField(write_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     is_link_discoverable = serializers.BooleanField(
         default=False,
@@ -140,6 +159,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             "category_name",
             "start_date",
             "expiration_date",
+            "tags",
             "get_tags",
             "ip_address",
             "is_link_discoverable",
@@ -160,12 +180,21 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         link_cards_data = validated_data.pop("link_card", {})
         link_utms_data = validated_data.pop("link_utm", [])
         link_redirects_data = validated_data.pop("link_redirect", [])
+        category_name = self.initial_data.get(
+            "category_name", None
+        )  # serializer expects cat as pk which will not be available for newly created shortlinks
 
         try:
             with transaction.atomic():
                 validated_data["shortcode"] = self._generate_unique_shortcode(
                     validated_data.get("shortcode")
                 )
+
+                if category_name:
+                    validated_data["category"], _ = Category.objects.get_or_create(
+                        name__iexact=category_name, defaults={"name": category_name}
+                    )
+
                 short_link = ShortLink.objects.create(**validated_data)
 
                 if manual_review:
@@ -175,6 +204,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
                     link_shortlink_data["user"] = self._get_user_instance(
                         link_shortlink_data["user"]
                     )
+
+                self._create_user_shortlink(short_link, link_shortlink_data)
 
                 # Create nested instance for LinkCard, LinkUTMParameter and LinkRedirect
                 self._create_nested_instances(
@@ -202,6 +233,16 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             raise DRFValidationError("An error occurred while creating the link")
 
         return short_link
+
+    def update(self, instance, validated_data):
+        category_name = validated_data.pop("category_name", None)
+        if category_name:
+            category, _ = Category.objects.get_or_create(
+                name__iexact=category_name, defaults={"name": category_name}
+            )
+            validated_data["category"] = category
+
+        return super().update(instance, validated_data)
 
     def _generate_unique_shortcode(self, shortcode=None):
         """
@@ -258,8 +299,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         Returns:
             None
         """
-        if link_cards_data:
-            LinkCard.objects.create(link=short_link, **link_cards_data)
+        for link_card_data in link_cards_data:
+            LinkCard.objects.create(link=short_link, **link_card_data)
         for link_utm_data in link_utms_data:
             LinkUTMParameter.objects.create(link=short_link, **link_utm_data)
         for link_redirect_data in link_redirects_data:
