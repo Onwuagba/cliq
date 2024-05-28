@@ -56,24 +56,24 @@ class LinkReviewSerializer(serializers.ModelSerializer):
 
 
 class LinkCardSerializer(serializers.ModelSerializer):
-    link = serializers.PrimaryKeyRelatedField(
-        queryset=ShortLink.objects.all(), required=False
-    )
+    # link = serializers.PrimaryKeyRelatedField(queryset=ShortLink.objects.all())
 
     class Meta:
         model = LinkCard
-        fields = ["card_title", "card_description", "card_thumbnail", "link"]
+        fields = [
+            "card_title",
+            "card_description",
+            "card_thumbnail",  # "link"
+        ]
 
 
 class LinkRedirectSerializer(serializers.ModelSerializer):
-    link = serializers.PrimaryKeyRelatedField(
-        queryset=ShortLink.objects.all(), required=False
-    )
+    # link = serializers.PrimaryKeyRelatedField(queryset=ShortLink.objects.all())
 
     class Meta:
         model = LinkRedirect
         fields = [
-            "link",
+            # "link",
             "redirect_link",
             "device_type",
             "time_of_day",
@@ -84,14 +84,12 @@ class LinkRedirectSerializer(serializers.ModelSerializer):
 
 
 class LinkUTMParameterSerializer(serializers.ModelSerializer):
-    link = serializers.PrimaryKeyRelatedField(
-        queryset=ShortLink.objects.all(), required=False
-    )
+    # link = serializers.PrimaryKeyRelatedField(queryset=ShortLink.objects.all())
 
     class Meta:
         model = LinkUTMParameter
         fields = (
-            "link",
+            # "link",
             "utm_source",
             "utm_medium",
             "utm_campaign",
@@ -140,7 +138,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         write_only=True, source="link_shortlink.link_password", required=False
     )
     user = serializers.CharField(source="link_shortlink.user", required=False)
-    link_card = LinkCardSerializer(many=True, required=False)
+    link_card = LinkCardSerializer(required=False)
     link_utm = LinkUTMParameterSerializer(many=True, required=False)
     link_redirect = LinkRedirectSerializer(many=True, required=False)
     start_date = serializers.DateTimeField(
@@ -254,10 +252,10 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         Returns:
             str: A unique shortcode that does not already exist in the ShortLink model.
         """
-        while True:
-            shortcode = shortcode or generate_shortcode()
-            if not ShortLink.objects.filter(shortcode__iexact=shortcode).exists():
-                return shortcode
+        shortcode = shortcode or generate_shortcode()
+        if not ShortLink.objects.filter(shortcode__iexact=shortcode).exists():
+            return shortcode
+        raise ValidationError("Shortcode %s already exists" % shortcode)
 
     def _get_user_instance(self, user_id):
         """
@@ -299,8 +297,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         Returns:
             None
         """
-        for link_card_data in link_cards_data:
-            LinkCard.objects.create(link=short_link, **link_card_data)
+        if link_cards_data:
+            LinkCard.objects.create(link=short_link, **link_cards_data)
         for link_utm_data in link_utms_data:
             LinkUTMParameter.objects.create(link=short_link, **link_utm_data)
         for link_redirect_data in link_redirects_data:

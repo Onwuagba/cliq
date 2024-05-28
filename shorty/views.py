@@ -144,7 +144,7 @@ class ShortLinkView(ListAPIView):
 
     def get(self, request):
         """
-        endpoint to get links created by user (token or via param)
+        endpoint to get links created by user (auth_token or via param)
         For param: ?session_id=<user_id>
 
         Return the list of ShortLink objects created by the user
