@@ -186,7 +186,7 @@ class UserShortLink(BaseModel):
         blank=True,
     )
     session_id = models.UUIDField(
-        editable=False, unique=True, null=True, blank=True
+        editable=False, null=True, blank=True
     )  # store session id for non authenticated users
     link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_shortlink"

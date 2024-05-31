@@ -216,9 +216,13 @@ class ShortLinkSerializer(serializers.ModelSerializer):
                     LinkReview.objects.create(link=short_link)
 
                 if "user" in link_shortlink_data:
-                    link_shortlink_data["user"] = self._get_user_instance(
+                    user_obj, user_key = self._get_user_instance(
                         link_shortlink_data["user"]
                     )
+                    link_shortlink_data.pop(
+                        "user"
+                    )  # delete the record sent from the request
+                    link_shortlink_data[user_key] = user_obj
 
                 self._create_user_shortlink(short_link, link_shortlink_data)
 
@@ -277,6 +281,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     def _get_user_instance(self, user_id):
         """
         Get the user instance with the specified user ID.
+        This method is only called when user is logged in or a sessionID is passed
 
         Parameters:
             user_id (int): The ID of the user.
@@ -284,7 +289,17 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         Returns:
             UserModel: The user instance with the specified user ID.
         """
-        return UserModel.objects.get(pk=user_id)
+        try:
+            return UserModel.objects.get(pk=user_id), "user"
+        except UserModel.DoesNotExist:
+            return (
+                UserShortLink.objects.filter(session_id__iexact=user_id)
+                .first()
+                .session_id,
+                "session_id",
+            )
+        except Exception:
+            raise ValidationError("User not found")
 
     def _create_user_shortlink(self, short_link, link_shortlink_data):
         """

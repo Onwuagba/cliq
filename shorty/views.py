@@ -243,8 +243,14 @@ class ShortLinkView(ListAPIView):
 
             data["ip_address"] = user_ip
 
-            if request.user.is_authenticated:
-                data["user"] = str(request.user.id)
+            user = (
+                request.user.id
+                if request.user.is_authenticated
+                else request.META.get("HTTP_SHORTID")
+            )
+
+            if user:
+                data["user"] = str(user)
             else:
                 # user is not authenticated so set expiration time for link
                 data["expiration_date"] = timezone.now() + timedelta(
