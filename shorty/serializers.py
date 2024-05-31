@@ -154,7 +154,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     )
     user = serializers.CharField(source="link_shortlink.user", required=False)
     link_card = LinkCardSerializer(required=False)
-    link_utm = LinkUTMParameterSerializer(many=True, required=False)
+    link_utm = LinkUTMParameterSerializer(required=False)
     link_redirect = LinkRedirectSerializer(many=True, required=False)
     start_date = serializers.DateTimeField(
         format="%Y-%m-%d %H:%M:%S", input_formats=None, required=False
@@ -162,12 +162,14 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     expiration_date = serializers.DateTimeField(
         format="%Y-%m-%d %H:%M:%S", input_formats=None, required=False
     )
+    full_url = serializers.URLField(source="get_full_url", read_only=True)
 
     class Meta:
         model = ShortLink
         fields = (
             "original_link",
             "shortcode",
+            "full_url",
             "category",
             "category_name",
             "start_date",
@@ -320,9 +322,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             link_redirect_serializer.save(link=short_link)
 
         if link_utms_data:
-            link_utm_serializer = LinkUTMParameterSerializer(
-                data=link_utms_data, many=True
-            )
+            link_utm_serializer = LinkUTMParameterSerializer(data=link_utms_data)
             link_utm_serializer.is_valid(raise_exception=True)
             link_utm_serializer.save(link=short_link)
 

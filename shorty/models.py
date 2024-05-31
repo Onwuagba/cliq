@@ -1,6 +1,7 @@
 import ipaddress
 import secrets
 import string
+from urllib.parse import urlencode
 import uuid
 
 from django.db import models, IntegrityError
@@ -94,8 +95,8 @@ class Blacklist(BaseModel):
 
 class ShortLink(BaseModel):
     original_link = models.URLField(
-        max_length=200, unique=True, validators=[validate_url]
-    )
+        max_length=200, validators=[validate_url]
+    )  # created custom unique validator. One link can have multiple utm tags which is 1-1 relationship
     shortcode = models.CharField(max_length=50, unique=True, blank=True, db_index=True)
     category = models.ForeignKey(
         Category,
@@ -134,6 +135,23 @@ class ShortLink(BaseModel):
 
     def get_tags(self):
         return [tag.strip() for tag in self.tags.split(",")] if self.tags else []
+
+    def get_full_url(self):
+        full_url = f"{self.original_link}/{self.shortcode}"
+
+        if hasattr(self, "link_utm"):
+            link_utm_obj = self.link_utm
+            utm_params = {
+                "utm_source": link_utm_obj.utm_source,
+                "utm_medium": link_utm_obj.utm_medium,
+                "utm_campaign": link_utm_obj.utm_campaign,
+                "utm_term": link_utm_obj.utm_term,
+                "utm_content": link_utm_obj.utm_content,
+            }
+            utm_query_string = urlencode({k: v for k, v in utm_params.items() if v})
+            full_url = f"{full_url}?{utm_query_string}"
+
+        return full_url
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -259,7 +277,9 @@ class LinkRedirect(BaseModel):
 
 
 class LinkUTMParameter(BaseModel):
-    link = models.ForeignKey(
+    # one original link can have several utm tags but not all can be created at one
+    # means that only one shortlink object can have multiple
+    link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_utm"
     )
     utm_source = models.CharField(max_length=100, null=True, blank=True)
