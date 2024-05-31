@@ -1,6 +1,7 @@
 from datetime import timedelta
 import logging
 import os
+from typing import Any, Dict, List
 import uuid
 
 from django.contrib.auth import get_user_model
@@ -9,10 +10,13 @@ from django.utils import timezone
 from dotenv import load_dotenv
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.parsers import (
+    MultiPartParser,
+    JSONParser,
+)
 from rest_framework import status, filters
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from common.permissions import IsAdmin
 from common.utilities.api_response import CustomAPIResponse
@@ -23,6 +27,8 @@ from shorty.utils import (
     get_user_ip,
     is_domain_blacklisted,
     is_ip_blacklisted,
+    is_valid_image,
+    is_valid_time_24h_format,
 )
 
 logger = logging.getLogger("app")
@@ -108,7 +114,10 @@ class ShortLinkView(ListAPIView):
     )  # allow any cos non-registered user can also create link
     serializer_class = ShortLinkSerializer
     http_method_names = ["get", "post"]
-    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    parser_classes = [
+        MultiPartParser,
+        JSONParser,
+    ]
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)
     filterset_fields = [
         "start_date",
@@ -144,16 +153,16 @@ class ShortLinkView(ListAPIView):
 
     def get(self, request):
         """
-        endpoint to get links created by user (auth_token or via param)
-        For param: ?session_id=<user_id>
+        endpoint to get links created by user (auth_token or via header)
+        For param: ShortID=<id_created_for_anonymous_user>
 
         Return the list of ShortLink objects created by the user
         If the user is authenticated, the endpoint will return links
         created by the user. If the user is not authenticated,
-        the endpoint will check for session_id parameter in the
-        request query parameters. If session_id is provided, the
+        the endpoint will check for ShortID header in the
+        request. If ShortID is provided, the
         endpoint will return links created by the user specified
-        by the session_id.
+        by the ShortID.
 
         :return: CustomAPIResponse object containing the list of
                     ShortLink objects or an error message if
@@ -166,7 +175,7 @@ class ShortLinkView(ListAPIView):
             user = (
                 request.user.id
                 if request.user.is_authenticated
-                else request.query_params.get("session_id")
+                else request.META.get("HTTP_SHORTID")
             )
 
             if not user:
@@ -200,7 +209,7 @@ class ShortLinkView(ListAPIView):
         status_msg = "failed"
 
         try:
-            data = request.data
+            data = request.data.copy()
             user_ip = get_user_ip(request)
 
             if "original_link" not in data:
@@ -211,8 +220,18 @@ class ShortLinkView(ListAPIView):
             if not original_link.startswith(("http://", "https://")):
                 data["original_link"] = "http://" + original_link
 
+            # validate redirect urls
             if data.get("link_redirect"):
-                data["link_redirect"] = self._update_urls(data["link_redirect"])
+                data["link_redirect"] = self._validate_redirect_urls(
+                    data["link_redirect"]
+                )
+
+            # validate card thumbnail
+            card = data.get("link_card", {})
+            if card and card.get("card_thumbnail"):
+                stat, msg = is_valid_image(card.get("card_thumbnail"))
+                if not stat:
+                    raise ValidationError(msg)
 
             if is_domain_blacklisted(original_link) or contains_blacklisted_texts(
                 original_link
@@ -254,9 +273,11 @@ class ShortLinkView(ListAPIView):
 
         return CustomAPIResponse(message, status_code, status_msg).send()
 
-    def _update_urls(self, links_redirect):
+    def _validate_redirect_urls(
+        self, links_redirect: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
-        Update urls in redirect links to ensure they start with http:// or https://
+        Validate and update urls in redirect links to ensure they start with http:// or https://
 
         Args:
             links_redirect (list): List of link dictionaries
@@ -264,8 +285,16 @@ class ShortLinkView(ListAPIView):
         Returns:
             list: List of link dictionaries with urls updated
         """
+
         updated_links_redirect = []
         for link_dict in links_redirect:
+            if "time_of_day" in link_dict and not is_valid_time_24h_format(
+                link_dict["time_of_day"]
+            ):
+                raise ValidationError(
+                    "Invalid time format. Should be HH:MM in 24h format"
+                )
+
             if "redirect_link" in link_dict and not link_dict[
                 "redirect_link"
             ].startswith(("http://", "https://")):

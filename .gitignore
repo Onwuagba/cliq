@@ -13,3 +13,5 @@ logs/**
 notes.txt
 .env.prod
 .ToDo
+media/
+.venv

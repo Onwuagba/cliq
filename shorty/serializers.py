@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from shorty.models import *
+from shorty.utils import is_valid_time_24h_format
 
 
 logger = logging.getLogger("app")
@@ -68,7 +69,21 @@ class LinkCardSerializer(serializers.ModelSerializer):
 
 
 class LinkRedirectSerializer(serializers.ModelSerializer):
-    # link = serializers.PrimaryKeyRelatedField(queryset=ShortLink.objects.all())
+    time_of_day = serializers.TimeField(
+        format="%H:%M", input_formats=None, required=False
+    )
+
+    def validate_redirect_link(self, value):
+        if value and not str(value).startswith(("http://", "https://")):
+            return f"http://{value}"
+        return value
+
+    def validate_time_of_day(self, value):
+        if value and not is_valid_time_24h_format(value):
+            raise serializers.ValidationError(
+                "Invalid time format. Should be HH:MM in 24h format"
+            )
+        return value
 
     class Meta:
         model = LinkRedirect
@@ -213,7 +228,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         except DjangoValidationError as e:
             # Extract the error message from the DjangoValidationError
             error_message = e.messages[0] if e.messages else "An error occurred"
-            logger.error(f"Validation error creating link: {error_message}")
+            logger.error(f"Validation error creating link: {str(e.args[0])}")
             raise DRFValidationError(error_message)
 
         except IntegrityError as e:
@@ -297,9 +312,28 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         Returns:
             None
         """
+        if link_redirects_data:
+            link_redirect_serializer = LinkRedirectSerializer(
+                data=link_redirects_data, many=True
+            )
+            link_redirect_serializer.is_valid(raise_exception=True)
+            link_redirect_serializer.save(link=short_link)
+
+        if link_utms_data:
+            link_utm_serializer = LinkUTMParameterSerializer(
+                data=link_utms_data, many=True
+            )
+            link_utm_serializer.is_valid(raise_exception=True)
+            link_utm_serializer.save(link=short_link)
+
         if link_cards_data:
-            LinkCard.objects.create(link=short_link, **link_cards_data)
-        for link_utm_data in link_utms_data:
-            LinkUTMParameter.objects.create(link=short_link, **link_utm_data)
-        for link_redirect_data in link_redirects_data:
-            LinkRedirect.objects.create(link=short_link, **link_redirect_data)
+            link_card_serializer = LinkCardSerializer(data=link_cards_data)
+            link_card_serializer.is_valid(raise_exception=True)
+            link_card_serializer.save(link=short_link)
+
+        # if link_cards_data:
+        #     LinkCard.objects.create(link=short_link, **link_cards_data)
+        # for link_utm_data in link_utms_data:
+        #     LinkUTMParameter.objects.create(link=short_link, **link_utm_data)
+        # for link_redirect_data in link_redirects_data:
+        #     LinkRedirect.objects.create(link=short_link, **link_redirect_data)
