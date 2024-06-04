@@ -92,7 +92,7 @@ def is_valid_time_24h_format(time_str):
 
 
 def is_valid_image(
-    file_path,
+    file,
     valid_formats=["JPEG", "PNG", "JPG", "WEBP"],
     min_width=100,
     min_height=100,
@@ -101,7 +101,7 @@ def is_valid_image(
     Check if the given file is a valid image.
 
     Parameters:
-    file_path (str): The path to the image file.
+    file (str): The image file.
     valid_formats (list, optional): List of valid image formats (e.g., ["JPEG", "PNG"]).
     min_width (int, optional): Minimum width of the image.
     min_height (int, optional): Minimum height of the image.
@@ -110,12 +110,12 @@ def is_valid_image(
     bool: True if the image is valid, False otherwise.
     """
     try:
-        with Image.open(file_path) as img:
+        with Image.open(file) as img:
             # Verify the image to check for corruption
             img.verify()
 
             # Re-open the image file to get format and size info
-            img = Image.open(file_path)
+            img = Image.open(file)
 
             # Check image format
             if valid_formats and img.format not in valid_formats:
@@ -134,7 +134,7 @@ def is_valid_image(
 
             return True, "_"
     except Exception as e:
-        print(str(e.args[0]), file_path)
+        print(str(e.args[0]), file.name)
         return False, "Error validating image"
 
 

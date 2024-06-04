@@ -528,3 +528,29 @@ class BlacklistCheck(APIView):
             status_msg = "failed"
 
         return CustomAPIResponse(message, status_code, status_msg).send()
+
+
+class ValidateImage(APIView):
+    permission_classes = (AllowAny, IsIPPermitted)
+    http_method_names = ["post"]
+
+    def post(self, request, **kwargs):
+        image_file = request.FILES.get("image")
+
+        if not image_file:
+            return CustomAPIResponse(
+                "Missing image file",
+                status.HTTP_400_BAD_REQUEST,
+                "failed",
+            ).send()
+
+        is_valid, message = is_valid_image(image_file)
+        if is_valid:
+            status_code = status.HTTP_200_OK
+            status_msg = "success"
+            message = "Valid image"
+        else:
+            status_code = status.HTTP_400_BAD_REQUEST
+            status_msg = "failed"
+
+        return CustomAPIResponse(message, status_code, status_msg).send()

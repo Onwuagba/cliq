@@ -5,6 +5,7 @@ from shorty.views import (
     CategoryView,
     ShortLinkView,
     ShortlinkDetailView,
+    ValidateImage,
 )
 
 app_name = "shorty"
@@ -18,4 +19,5 @@ urlpatterns = [
         name="shortlink_instance",
     ),
     path("blacklist/", BlacklistCheck.as_view(), name="blacklist"),
+    path("validate_image/", ValidateImage.as_view(), name="validate_image"),
 ]
