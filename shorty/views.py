@@ -19,7 +19,7 @@ from rest_framework import status, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 
-from common.permissions import IsAdmin
+from common.permissions import IsAdmin, IsIPPermitted
 from common.utilities.api_response import CustomAPIResponse
 from shorty.models import Blacklist, Category, ShortLink, UserShortLink
 from shorty.serializers import CategorySerializer, ShortLinkSerializer
@@ -113,6 +113,7 @@ class CategoryView(ListAPIView):
 class ShortLinkView(ListAPIView):
     permission_classes = (
         AllowAny,
+        IsIPPermitted,
     )  # allow any cos non-registered user can also create link
     serializer_class = ShortLinkSerializer
     http_method_names = ["get", "post"]
@@ -317,6 +318,7 @@ class ShortLinkView(ListAPIView):
 class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = (
         AllowAny,
+        IsIPPermitted,
     )  # allow any cos non-registered user can also create link
     serializer_class = ShortLinkSerializer
     http_method_names = ["get", "patch", "delete"]
@@ -461,6 +463,12 @@ class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
 
 
 class BlacklistCheck(APIView):
+    permission_classes = (
+        AllowAny,
+        IsIPPermitted,
+    )
+    serializer_class = ShortLinkSerializer
+    http_method_names = ["get", "post"]
     """
     Check if a text/link/ip is blacklisted
     """
@@ -484,7 +492,7 @@ class BlacklistCheck(APIView):
 
         if blacklist_type == "ip":
             # pull the logged in user's IP address
-            entry = get_user_ip(request)
+            entry = entry or get_user_ip(request)
         elif blacklist_type == "domain":
             entry = validate_link(entry)
         elif blacklist_type == "text":
