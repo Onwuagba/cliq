@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 import os
 from typing import Any, Dict, List
@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 from dotenv import load_dotenv
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import (
     MultiPartParser,
@@ -16,7 +16,7 @@ from rest_framework.parsers import (
 )
 from rest_framework import status, filters
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 
 from common.permissions import IsAdmin
 from common.utilities.api_response import CustomAPIResponse
@@ -264,7 +264,8 @@ class ShortLinkView(ListAPIView):
             message = {
                 "shortcode": serializer.data["shortcode"],
                 "original_link": serializer.data["original_link"],
-                "full_url": "TRUE",
+                "full_url": serializer.data["full_url"],
+                "session_id": serializer.data["session_id"],
             }
             status_msg = "success"
             status_code = status.HTTP_201_CREATED
@@ -309,3 +310,144 @@ class ShortLinkView(ListAPIView):
             updated_links_redirect.append(link_dict)
 
         return updated_links_redirect
+
+
+class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = (
+        AllowAny,
+    )  # allow any cos non-registered user can also create link
+    serializer_class = ShortLinkSerializer
+    http_method_names = ["get", "patch", "delete"]
+    parser_classes = [
+        MultiPartParser,
+        JSONParser,
+    ]
+
+    def get_queryset(self):
+        return ShortLink.objects.filter(shortcode=self.kwargs["shortcode"])
+
+    def get_object(self, user=None):
+        """
+        Retrieves a ShortLink object based on the provided shortcode and user.
+
+        Parameters:
+            user (str, optional): The user associated with the ShortLink object. Defaults to None.
+
+        Returns:
+            ShortLink: The ShortLink object with the specified shortcode and user.
+
+        Raises:
+            NotFound: If no ShortLink object with the specified shortcode and user is found.
+        """
+        try:
+            obj = (
+                ShortLink.objects.get(shortcode=self.kwargs["shortcode"])
+                if not user
+                else ShortLink.objects.get(
+                    (Q(link_shortlink__user=user) | Q(link_shortlink__session_id=user)),
+                    shortcode=self.kwargs["shortcode"],
+                )  # for patch
+            )
+        except ShortLink.DoesNotExist:
+            raise NotFound("Link not found")
+
+        # Check if start_date is in the future
+        # user is passed for patch and delete endpoints so we don't check for start_date
+        if (
+            not user
+            and obj.start_date
+            and obj.start_date > timezone.make_aware(datetime.now())
+        ):
+            raise NotFound("Link is not available yet")
+
+        return obj
+
+    def get(self, request, **kwargs):
+        """
+        get shortlink details
+        """
+        # no auth required cos this is the endpoint that is called when link is shared
+        status_code = status.HTTP_400_BAD_REQUEST
+        status_msg = "failed"
+
+        try:
+            obj = self.get_object()
+            serializer = self.serializer_class(obj)
+            message = serializer.data
+            status_msg = "success"
+            status_code = status.HTTP_200_OK
+        except NotFound as ex:
+            message = str(ex.args[0])
+            status_code = status.HTTP_404_NOT_FOUND
+        except Exception as e:
+            logger.error(f"Exception in ShortlinkDetailView: {str(e.args[0])}")
+            message = str(e.args[0])
+
+        return CustomAPIResponse(message, status_code, status_msg).send()
+
+    def patch(self, request, *args, **kwargs):
+        status_code = status.HTTP_400_BAD_REQUEST
+        status_msg = "failed"
+
+        try:
+            user = (
+                request.user.id
+                if request.user.is_authenticated
+                else request.META.get("HTTP_SHORTID")
+            )
+
+            if not user:
+                return CustomAPIResponse(
+                    "User not authenticated",
+                    status.HTTP_401_UNAUTHORIZED,
+                    status_msg,
+                ).send()
+
+            obj = self.get_object(user)
+            serializer = self.serializer_class(obj, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            message = "Link updated successfully"
+            status_code = status.HTTP_200_OK
+            status_msg = "success"
+        except NotFound as ex:
+            message = str(ex.args[0])
+            status_code = status.HTTP_404_NOT_FOUND
+        except Exception as e:
+            logger.error(f"Exception in ShortlinkDetailView: {str(e.args[0])}")
+            message = str(e.args[0])
+
+        return CustomAPIResponse(message, status_code, status_msg).send()
+
+    def delete(self, request, *args, **kwargs):
+        status_code = status.HTTP_400_BAD_REQUEST
+        status_msg = "failed"
+
+        try:
+            user = (
+                request.user.id
+                if request.user.is_authenticated
+                else request.META.get("HTTP_SHORTID")
+            )
+
+            if not user:
+                return CustomAPIResponse(
+                    "User not authenticated",
+                    status.HTTP_401_UNAUTHORIZED,
+                    status_msg,
+                ).send()
+
+            obj = self.get_object(user)
+            obj.is_deleted = True
+            obj.save()
+            message = "Link deleted successfully"
+            status_code = status.HTTP_204_NO_CONTENT
+            status_msg = "success"
+        except NotFound as ex:
+            message = str(ex.args[0])
+            status_code = status.HTTP_404_NOT_FOUND
+        except Exception as e:
+            logger.error(f"Exception in ShortlinkDetailView: {str(e.args[0])}")
+            message = str(e.args[0])
+
+        return CustomAPIResponse(message, status_code, status_msg).send()

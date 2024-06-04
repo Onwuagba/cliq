@@ -1,10 +1,15 @@
 from django.urls import path
 
-from shorty.views import CategoryView, ShortLinkView
+from shorty.views import CategoryView, ShortLinkView, ShortlinkDetailView
 
 app_name = "shorty"
 
 urlpatterns = [
     path("category/", CategoryView.as_view(), name="category"),
     path("shortlink/", ShortLinkView.as_view(), name="shortlink"),
+    path(
+        "shortlink/<str:shortcode>",
+        ShortlinkDetailView.as_view(),
+        name="shortlink_instance",
+    ),
 ]

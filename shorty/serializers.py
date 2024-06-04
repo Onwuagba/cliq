@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlparse
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
@@ -62,6 +63,7 @@ class LinkCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = LinkCard
         fields = [
+            "id",
             "card_title",
             "card_description",
             "card_thumbnail",  # "link"
@@ -89,6 +91,7 @@ class LinkRedirectSerializer(serializers.ModelSerializer):
         model = LinkRedirect
         fields = [
             # "link",
+            "id",
             "redirect_link",
             "device_type",
             "time_of_day",
@@ -105,6 +108,7 @@ class LinkUTMParameterSerializer(serializers.ModelSerializer):
         model = LinkUTMParameter
         fields = (
             # "link",
+            "id",
             "utm_source",
             "utm_medium",
             "utm_campaign",
@@ -136,7 +140,7 @@ class AnalyticsSerializer(serializers.ModelSerializer):
 
 class ShortLinkSerializer(serializers.ModelSerializer):
     ip_address = serializers.IPAddressField(write_only=True)
-    tags = serializers.CharField(write_only=True)
+    tags = serializers.CharField(write_only=True, required=False)
     category_name = serializers.CharField(source="category.name", read_only=True)
     is_link_discoverable = serializers.BooleanField(
         default=False,
@@ -152,7 +156,9 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     link_password = serializers.CharField(
         write_only=True, source="link_shortlink.link_password", required=False
     )
-    user = serializers.CharField(source="link_shortlink.user", required=False)
+    user = serializers.CharField(
+        source="link_shortlink.user", required=False, write_only=True
+    )
     link_card = LinkCardSerializer(required=False)
     link_utm = LinkUTMParameterSerializer(required=False)
     link_redirect = LinkRedirectSerializer(many=True, required=False)
@@ -167,6 +173,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShortLink
         fields = (
+            "id",
             "original_link",
             "shortcode",
             "full_url",
@@ -188,6 +195,19 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             "link_redirect",
         )
 
+    def validate_original_link(self, value):
+        parsed_url = urlparse(value)
+        if not parsed_url.scheme:
+            value = f"http://{value}"
+        return value
+
+    def to_internal_value(self, data):
+        # Ensure the original link is correctly formatted before any other processing
+        original_link = data.get('original_link')
+        if original_link:
+            data['original_link'] = self.validate_original_link(original_link)
+        return super().to_internal_value(data)
+    
     def create(self, validated_data):
         # Extract nested data
         link_shortlink_data = validated_data.pop("link_shortlink", {})
@@ -255,13 +275,40 @@ class ShortLinkSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         category_name = validated_data.pop("category_name", None)
-        if category_name:
-            category, _ = Category.objects.get_or_create(
-                name__iexact=category_name, defaults={"name": category_name}
-            )
-            validated_data["category"] = category
+        link_card_data = validated_data.pop("link_card", None)
+        link_utm_data = validated_data.pop("link_utm", None)
+        link_redirect_data = validated_data.pop("link_redirect", None)
+        link_shortlink_data = validated_data.pop("link_shortlink", None)
 
-        return super().update(instance, validated_data)
+        try:
+            with transaction.atomic():
+                # Handle category creation or update
+                if category_name:
+                    category, _ = Category.objects.get_or_create(
+                        name__iexact=category_name, defaults={"name": category_name}
+                    )
+                    validated_data["category"] = category
+
+                # Update simple fields
+                for attr, value in validated_data.items():
+                    setattr(instance, attr, value)
+                instance.save()
+
+                # Update or create UserShortLink attributes
+                if link_shortlink_data:
+                    UserShortLink.objects.update_or_create(
+                        link=instance, defaults=link_shortlink_data
+                    )
+
+                # Update or create nested instances
+                self._update_nested_instances(
+                    instance, link_card_data, link_utm_data, link_redirect_data
+                )
+
+        except IntegrityError as e:
+            raise ValidationError({"detail": str(e)})
+
+        return instance
 
     def _generate_unique_shortcode(self, shortcode=None):
         """
@@ -293,7 +340,9 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             return UserModel.objects.get(pk=user_id), "user"
         except UserModel.DoesNotExist:
             return (
-                UserShortLink.objects.filter(session_id__iexact=user_id)
+                UserShortLink.objects.filter(
+                    session_id__iexact=user_id
+                )  # using filter instead of get cos the model can have same session_id
                 .first()
                 .session_id,
                 "session_id",
@@ -346,9 +395,56 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             link_card_serializer.is_valid(raise_exception=True)
             link_card_serializer.save(link=short_link)
 
-        # if link_cards_data:
-        #     LinkCard.objects.create(link=short_link, **link_cards_data)
-        # for link_utm_data in link_utms_data:
-        #     LinkUTMParameter.objects.create(link=short_link, **link_utm_data)
-        # for link_redirect_data in link_redirects_data:
-        #     LinkRedirect.objects.create(link=short_link, **link_redirect_data)
+    def _update_nested_instances(
+        self, short_link, link_cards_data, link_utms_data, link_redirects_data
+    ):
+        """
+        Updates nested instances of LinkCard, LinkUTMParameter, and LinkRedirect objects.
+
+        Args:
+            short_link (ShortLink): The short link object to associate the nested instances with.
+            link_cards_data (dict): The data for updating LinkCard objects.
+            link_utms_data (list): The data for updating LinkUTMParameter objects.
+            link_redirects_data (list): The data for updating LinkRedirect objects.
+
+        Returns:
+            None
+        """
+        # Update or create LinkCard
+        if link_cards_data:
+            if hasattr(short_link, "link_card") and short_link.link_card:
+                link_card_serializer = LinkCardSerializer(
+                    short_link.link_card, data=link_cards_data
+                )
+            else:
+                link_card_serializer = LinkCardSerializer(data=link_cards_data)
+            link_card_serializer.is_valid(raise_exception=True)
+            link_card_serializer.save(link=short_link)
+
+        # Update or create LinkUTMParameter
+        if link_utms_data:
+            if hasattr(short_link, "link_utm") and short_link.link_utm:
+                link_utm_serializer = LinkUTMParameterSerializer(
+                    short_link.link_utm, data=link_utms_data
+                )
+            else:
+                link_utm_serializer = LinkUTMParameterSerializer(data=link_utms_data)
+            link_utm_serializer.is_valid(raise_exception=True)
+            link_utm_serializer.save(link=short_link)
+
+        # Update or create LinkRedirect
+        if link_redirects_data:
+            # First clear existing redirects
+            short_link.link_redirect.all().delete()
+            # Create new redirects
+            link_redirect_serializer = LinkRedirectSerializer(
+                data=link_redirects_data, many=True
+            )
+            link_redirect_serializer.is_valid(raise_exception=True)
+            link_redirect_serializer.save(link=short_link)
+
+    def to_representation(self, instance):
+        response = super().to_representation(instance)
+        response.update({"session_id": instance.link_shortlink.session_id})
+
+        return response

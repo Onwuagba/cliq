@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 
 from main.constants import BLACKLIST, OS_CHOICES, REDIRECT_CHOICES, STATUS
 from main.models import BaseModel, UserAccount
@@ -197,7 +197,7 @@ class UserShortLink(BaseModel):
     link_password = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user} - {self.link.shortcode}"
+        return f"{(self.user or self.session_id)} - {self.link.shortcode}"
 
     def clean(self):
         super().clean()
@@ -206,13 +206,23 @@ class UserShortLink(BaseModel):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        if self.link_password and not self.is_link_protected:
-            self.is_link_protected = True
-        if self._state.adding:
-            if self.link_password:
+        if self.link_password:
+            if not self.is_link_protected:
+                self.is_link_protected = True
+
+            # Check if the instance is being updated
+            if self.pk is not None:
+                # Fetch the current password from the database
+                current_password = UserShortLink.objects.get(pk=self.pk).link_password
+
+                if not check_password(self.link_password, current_password):
+                    self.link_password = make_password(self.link_password)
+            else:
+                # Hash the password if this is a new instance
                 self.link_password = make_password(self.link_password)
-            if not self.user and not self.session_id:
-                self.session_id = uuid.uuid4()
+
+        if self._state.adding and not self.user and not self.session_id:
+            self.session_id = uuid.uuid4()
         super().save(*args, **kwargs)
 
 
