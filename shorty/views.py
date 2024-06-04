@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 from dotenv import load_dotenv
+from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import (
@@ -20,7 +21,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError, NotFoun
 
 from common.permissions import IsAdmin
 from common.utilities.api_response import CustomAPIResponse
-from shorty.models import Category, ShortLink, UserShortLink
+from shorty.models import Blacklist, Category, ShortLink, UserShortLink
 from shorty.serializers import CategorySerializer, ShortLinkSerializer
 from shorty.utils import (
     contains_blacklisted_texts,
@@ -29,6 +30,7 @@ from shorty.utils import (
     is_ip_blacklisted,
     is_valid_image,
     is_valid_time_24h_format,
+    validate_link,
 )
 
 logger = logging.getLogger("app")
@@ -449,5 +451,72 @@ class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
         except Exception as e:
             logger.error(f"Exception in ShortlinkDetailView: {str(e.args[0])}")
             message = str(e.args[0])
+
+        return CustomAPIResponse(message, status_code, status_msg).send()
+
+
+######################
+#### GENERICS
+######################
+
+
+class BlacklistCheck(APIView):
+    """
+    Check if a text/link/ip is blacklisted
+    """
+
+    def post(self, request, **kwargs):
+        """Check if a text/link/ip is blacklisted.
+
+        Payload:
+            blacklist_type: The type of blacklist to check (ip/domain/text).
+            entry: The text/link/ip to check.
+        """
+        blacklist_type = request.data.get("blacklist_type")
+        entry = request.data.get("entry")
+
+        if not blacklist_type or not entry:
+            return CustomAPIResponse(
+                "Missing blacklist_type or entry",
+                status.HTTP_400_BAD_REQUEST,
+                "failed",
+            ).send()
+
+        if blacklist_type == "ip":
+            # pull the logged in user's IP address
+            entry = get_user_ip(request)
+        elif blacklist_type == "domain":
+            entry = validate_link(entry)
+        elif blacklist_type == "text":
+            entry = validate_link(entry)
+        else:
+            return CustomAPIResponse(
+                "Invalid blacklist type",
+                status.HTTP_400_BAD_REQUEST,
+                "failed",
+            ).send()
+
+        return self._check_blacklist(blacklist_type, entry)
+
+    def _check_blacklist(self, blacklist_type, entry):
+        if blacklist_type == "ip":
+            blacklist_check = is_ip_blacklisted(entry)
+        elif blacklist_type == "domain":
+            blacklist_check = is_domain_blacklisted(entry)
+        elif blacklist_type == "text":
+            blacklist_check = contains_blacklisted_texts(entry)
+        else:
+            return CustomAPIResponse(
+                "Invalid blacklist type", status.HTTP_400_BAD_REQUEST, "failed"
+            ).send()
+
+        if blacklist_check:
+            message = f"{blacklist_type} - {entry} is blacklisted"
+            status_code = status.HTTP_200_OK
+            status_msg = "success"
+        else:
+            message = f"{blacklist_type} - {entry} is not blacklisted"
+            status_code = status.HTTP_404_NOT_FOUND
+            status_msg = "failed"
 
         return CustomAPIResponse(message, status_code, status_msg).send()

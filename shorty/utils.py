@@ -139,6 +139,7 @@ def is_valid_image(
 
 
 def validate_link(value):
-    if value and not str(value).startswith(("http://", "https://")):
-        return f"http://{value}"
+    parsed_url = urlparse(value)
+    if not parsed_url.scheme:
+        value = f"http://{value}"
     return value
