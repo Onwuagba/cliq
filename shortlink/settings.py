@@ -48,6 +48,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "common.middleware.RestrictAdminMiddleware",
+    "common.middleware.ChecksumMiddleware",
 ]
 
 ROOT_URLCONF = "shortlink.urls"
