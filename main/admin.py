@@ -37,7 +37,7 @@ class CustomAdmin(UserAdmin):
         "is_deleted",
     )
 
-    ordering = ("created_at",)
+    ordering = ("-created_at",)
     add_fieldsets = (
         (
             None,

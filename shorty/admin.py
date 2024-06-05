@@ -100,6 +100,7 @@ class UserShortLinkAdmin(DefaultAdmin):
         "user__email",
         "user__first_name",
         "user__last_name",
+        "session_id",
     )
     list_filter = (
         "is_link_discoverable",

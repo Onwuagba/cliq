@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from main.views import (
+    ChangeAccountView,
     ChangePasswordView,
     ConfirmEmailView,
     CustomTokenView,
@@ -24,6 +25,7 @@ urlpatterns = [
     # auth
     path("", Home.as_view()),
     path("signup/", RegisterAPIView.as_view(), name="signup"),
+    path("change_account/", ChangeAccountView.as_view(), name="change_account"),
     path(
         "confirm_email/<str:uid>/<str:token>/",
         ConfirmEmailView.as_view(),

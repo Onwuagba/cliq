@@ -59,7 +59,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        password = validated_data.pop("password")
         validated_data.pop("confirm_password", None)
 
         try:
@@ -74,7 +73,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
                         "account already exists. Please request confirmation again"
                     )
                 else:
-                    user.set_password(password)
+                    user.set_password(validated_data.get("password"))
                     user.save()
 
         except Exception as e:

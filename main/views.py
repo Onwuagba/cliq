@@ -25,6 +25,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from common.helpers import AnonLinkCreationThrottle, UserLinkCreationThrottle
+from common.permissions import IsIPPermitted
 from common.utilities.api_response import CustomAPIResponse
 from common.utilities.generics import check_email_username
 from main.serializers import (
@@ -42,6 +43,8 @@ from main.tasks import send_notif_email
 from main.models import CustomToken
 from common.exceptions import AccountLocked, AlreadyExists
 from dotenv import load_dotenv
+
+from shorty.models import UserShortLink
 
 logger = logging.getLogger("app")
 UserModel = get_user_model()
@@ -473,3 +476,59 @@ class ResetPasswordView(UpdateAPIView):
             status_code = status.HTTP_400_BAD_REQUEST
 
         return CustomAPIResponse(message, status_code, status_msg).send()
+
+
+class ChangeAccountView(CreateAPIView):
+    # view for when an unauthenticated user (using session ID) wants to create an account
+    permission_classes = (AllowAny, IsIPPermitted)
+    serializer_class = RegistrationSerializer
+    http_method_names = ["post"]
+
+    def get_object(self, shortid):
+        try:
+            return UserShortLink.objects.filter(
+                session_id=shortid, user__isnull=True
+            ).first()
+        except:  # an exception is raised if shortid param is not a valid UUID
+            return None
+
+    def post(self, request):
+        status_code = status.HTTP_400_BAD_REQUEST
+        status_msg = "failed"
+
+        short_id = request.META.get("HTTP_SHORTID")
+
+        instance = self.get_object(short_id)
+        if not instance:
+            return CustomAPIResponse(
+                "No ShortID found for current session",
+                status_code,
+                status_msg,
+            ).send()
+
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            self._move_data(instance, user)
+            message = (
+                "Registration successful."
+                "Please confirm your email to complete process"
+            )
+            status_code = status.HTTP_201_CREATED
+            status_msg = "success"
+        except Exception as e:
+            logger.error(
+                f"Exception in registration. Email {request.data.get('email')}: {str(e.args[0])}"
+            )
+            message = e.args[0]
+
+        return CustomAPIResponse(message, status_code, status_msg).send()
+
+    def _move_data(self, short_id: UserShortLink, user):
+        if not short_id or not user:
+            return
+
+        UserShortLink.objects.filter(session_id=short_id.session_id).update(user=user)
