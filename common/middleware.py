@@ -2,14 +2,20 @@ import hashlib
 import hmac
 import json
 from datetime import datetime
+import time, logging
+
+from django.conf import settings
 
 from django.contrib import auth
 from django.utils import timezone
 from django.http import HttpResponseForbidden, JsonResponse
-from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from shortlink.settings import ALLOWED_ADMIN_IPS
+
+logger = logging.getLogger("app")
 
 
 class RestrictAdminMiddleware:
@@ -149,3 +155,75 @@ class ChecksumMiddleware(MiddlewareMixin):
             except Exception as e:
                 response["X-HMAC-Error"] = str(e)
         return response
+
+
+class JWTCookieMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        access_cookie = settings.SIMPLE_JWT["AUTH_COOKIE"]
+        refresh_cookie = settings.SIMPLE_JWT["REFRESH_COOKIE"]
+        access_token = request.COOKIES.get(access_cookie)
+        refresh_token = request.COOKIES.get(refresh_cookie)
+
+        if access_token:
+            jwt_authenticator = JWTAuthentication()
+            try:
+                # raw_token = access_token.encode(HTTP_HEADER_ENCODING)
+                validated_token = jwt_authenticator.get_validated_token(access_token)
+                exp_time = validated_token["exp"]
+                current_time = int(time.time())
+
+                # Check if token is about to expire in 1 minute
+                if exp_time - current_time < 60 and refresh_token:
+                    new_access_token = self.refresh_access_token(refresh_token)
+                    if new_access_token:
+                        self.set_jwt_cookie(request, new_access_token)
+                        request.META["HTTP_AUTHORIZATION"] = (
+                            f"Bearer {new_access_token}"
+                        )
+
+                # Update request authorization header with the access token
+                # request.META['HTTP_AUTHORIZATION'] = f'Bearer {access_token}'
+                request.user = jwt_authenticator.get_user(validated_token)
+            except TokenError:
+                if refresh_token:
+                    new_access_token = self.refresh_access_token(refresh_token)
+                    if new_access_token:
+                        self.set_jwt_cookie(request, new_access_token)
+                        request.META["HTTP_AUTHORIZATION"] = (
+                            f"Bearer {new_access_token}"
+                        )
+                        validated_token = jwt_authenticator.get_validated_token(
+                            new_access_token
+                        )
+                        request.user = jwt_authenticator.get_user(validated_token)
+                else:
+                    request.user = None
+            except Exception as e:
+                logger.error(f"Error from JWT middleware: {str(e.args[0])}")
+                request.user = None
+        else:
+            request.user = None
+
+        response = self.get_response(request)
+        return response
+
+    def refresh_access_token(self, refresh_token):
+        try:
+            refresh = RefreshToken(refresh_token)
+            return str(refresh.access_token)
+        except TokenError:
+            return None
+
+    def set_jwt_cookie(self, response, token):
+        cookie_max_age = settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds()
+        response.set_cookie(
+            key=settings.SIMPLE_JWT["AUTH_COOKIE"],
+            value=token,
+            max_age=cookie_max_age,
+            secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
+            httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+            samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        )

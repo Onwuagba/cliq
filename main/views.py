@@ -7,11 +7,13 @@ import logging
 
 from base64 import urlsafe_b64decode
 import os
+from django.conf import settings
 from django.contrib.auth import get_user_model, logout
 
 from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
 
+from django.http import HttpResponse
 from django.utils import timezone
 
 from rest_framework import status
@@ -392,6 +394,52 @@ class CustomTokenView(jwt_views.TokenObtainPairView):
     token_obtain_pair = jwt_views.TokenObtainPairView.as_view()
     http_method_names = ["post"]
 
+    
+    def set_jwt_cookie(self, response: HttpResponse, token: str) -> None:
+        """
+        Sets the JWT cookie on the response.
+
+        Args:
+            response (HttpResponse): The response object.
+            token (str): The JWT token.
+
+        Returns:
+            None
+        """
+        cookie_settings = {
+            "max-age": settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
+            "secure": settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
+            "httponly": settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+            "samesite": settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        }
+        response.set_cookie(settings.SIMPLE_JWT["AUTH_COOKIE"], token, **cookie_settings)
+
+
+    def set_refresh_cookie(self, response: HttpResponse, token: str) -> None:
+        """
+        Sets the refresh cookie on the response.
+
+        Args:
+            response (HttpResponse): The response object.
+            token (str): The refresh token.
+
+        Returns:
+            None
+        """
+        cookie_max_age = settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()
+        cookie_settings = {
+            "max-age": cookie_max_age,
+            "secure": settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
+            "httponly": settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+            "samesite": settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+        }
+        response.set_cookie(
+            settings.SIMPLE_JWT["REFRESH_COOKIE"],
+            token,
+            **cookie_settings,
+        )
+
+
     def post(self, request, *args, **kwargs):
         try:
             serializer = self.serializer_class(
@@ -401,7 +449,14 @@ class CustomTokenView(jwt_views.TokenObtainPairView):
                 },
             )
             serializer.is_valid(raise_exception=True)
-            return Response(serializer._validated_data, status=status.HTTP_200_OK)
+            validated_data = serializer.validated_data
+            access_token = validated_data['access']
+            refresh_token = validated_data['refresh']
+
+            response = Response(validated_data, status=status.HTTP_200_OK)
+            self.set_jwt_cookie(response, access_token)
+            self.set_refresh_cookie(response, refresh_token)
+            return response
         except TokenError as ex:
             raise InvalidToken(ex.args[0]) from ex
         except (ValidationError, AccountLocked, Exception) as exc:

@@ -209,12 +209,20 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_COOKIE": "ace_jwt",  # Cookie name. Enables cookies if value is set.
+    "REFRESH_COOKIE": "ref_jwt",  # Cookie name. Enables cookies if value is set.
+    "AUTH_COOKIE_SECURE": True,  # Whether the auth cookies should be secure (https:// only).
+    "AUTH_COOKIE_HTTP_ONLY": True,  # Http only cookie flag.It's not fetch by javascript.
+    "AUTH_COOKIE_PATH": "/",  # The path of the auth cookie.
+    "AUTH_COOKIE_SAMESITE": "Lax",  # Whether to set the flag restricting cookie leaks on cross-site requests.
+    # This can be 'Lax', 'Strict', or None to disable the flag.
+    "AUTH_COOKIE_DOMAIN": None,  # A string like "example.com", or None for standard domain cookie.
 }
 
 REST_FRAMEWORK = {
     "NON_FIELD_ERRORS_KEY": "error",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
-    "PAGE_SIZE": 15,
+    "PAGE_SIZE": 20,
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
