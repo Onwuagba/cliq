@@ -89,7 +89,8 @@ class RegisterAPIView(CreateAPIView):
                 status_msg = "failed"
         except Exception as e:
             logger.error(
-                f"Exception in registration. Email {request.data.get('email')}: {str(e.args[0])}"
+                f"Exception in registration. Email {request.data.get('email')}: {
+                    str(e.args[0])}"
             )
             message = e.args[0]
             status_code = status.HTTP_400_BAD_REQUEST
@@ -143,7 +144,8 @@ class ConfirmEmailView(UpdateAPIView):
             )
 
         if user.is_active:
-            raise ValidationError("Account already verified. Proceed to login")
+            raise ValidationError(
+                "Account already verified. Proceed to login")
 
         if (
             token_obj.expiry_date is not None
@@ -167,7 +169,8 @@ class ConfirmEmailView(UpdateAPIView):
             status_code = status.HTTP_200_OK
         except Exception as e:
             logger.error(
-                f"Exception in confirming email - {request.data.get('email')}: str(e.args[0])"
+                f"Exception in confirming email - {
+                    request.data.get('email')}: str(e.args[0])"
             )
             message = e.args[0]
             status_msg = "failed"
@@ -191,7 +194,8 @@ class ConfirmEmailView(UpdateAPIView):
             status_code = status.HTTP_200_OK
         except Exception as e:
             logger.error(
-                f"Exception in confirming email - {request.data.get('email')}: str(e.args[0])"
+                f"Exception in confirming email - {
+                    request.data.get('email')}: str(e.args[0])"
             )
             message = e.args[0]
             status_msg = "failed"
@@ -227,7 +231,8 @@ class ForgotPasswordView(APIView):
             status_code = status.HTTP_200_OK
         except Exception as e:
             logger.error(
-                f"Exception in forgot password - {reset_data.get('email')}: str(e.args[0])"
+                f"Exception in forgot password - {
+                    reset_data.get('email')}: str(e.args[0])"
             )
             message = e.args[0]
             status_msg = "failed"
@@ -279,7 +284,8 @@ class ChangePasswordView(UpdateAPIView):
             status_msg = "success"
             status_code = status.HTTP_200_OK
         except Exception as e:
-            logger.error(f"Exception in change password: str(e.args[0])")
+            logger.error(
+                f"Exception in change password: str(e.args[0])")
             message = e.args[0]
             status_msg = "failed"
             status_code = status.HTTP_400_BAD_REQUEST
@@ -314,7 +320,8 @@ class RegenerateEmailVerificationView(CreateAPIView):
             status_msg = "success"
             status_code = status.HTTP_200_OK
         except Exception as e:
-            logger.error(f"Exception in regenerate email: str(e.args[0])")
+            logger.error(
+                f"Exception in regenerate email: str(e.args[0])")
             message = e.args[0]
             status_msg = "failed"
             status_code = status.HTTP_400_BAD_REQUEST
@@ -357,7 +364,8 @@ class DeleteAccountView(APIView):
 
             self.send_mail(user)
         except (PermissionDenied, Exception) as e:
-            logger.info(f"Exception in delete account: str(e.args[0])")
+            logger.info(
+                f"Exception in delete account: str(e.args[0])")
             message = e.args[0]
             status_msg = "failed"
             status_code = (
@@ -382,7 +390,8 @@ class DeleteAccountView(APIView):
             ),  # num of days to keep account
             "admin_email": admin_support_sender,
         }
-        logger.info(f"context for email called from delete account endpoint: {context}")
+        logger.info(
+            f"context for email called from delete account endpoint: {context}")
 
         # call celery
         send_notif_email.delay(email_content, context)
@@ -391,88 +400,76 @@ class DeleteAccountView(APIView):
 # customise JWT login payload to accept email
 class CustomTokenView(jwt_views.TokenObtainPairView):
     serializer_class = CustomTokenSerializer
-    token_obtain_pair = jwt_views.TokenObtainPairView.as_view()
     http_method_names = ["post"]
 
-    
-    def set_jwt_cookie(self, response: HttpResponse, token: str) -> None:
+    def set_cookie(self, response: HttpResponse, key: str, value: str, max_age: int) -> None:
         """
-        Sets the JWT cookie on the response.
+        Sets a secure cookie on the response.
 
         Args:
             response (HttpResponse): The response object.
-            token (str): The JWT token.
+            key (str): The cookie key.
+            value (str): The cookie value.
+            max_age (int): The maximum age of the cookie in seconds.
 
         Returns:
             None
         """
-        cookie_settings = {
-            "max-age": settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
-            "secure": settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
-            "httponly": settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
-            "samesite": settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
-        }
-        response.set_cookie(settings.SIMPLE_JWT["AUTH_COOKIE"], token, **cookie_settings)
-
-
-    def set_refresh_cookie(self, response: HttpResponse, token: str) -> None:
-        """
-        Sets the refresh cookie on the response.
-
-        Args:
-            response (HttpResponse): The response object.
-            token (str): The refresh token.
-
-        Returns:
-            None
-        """
-        cookie_max_age = settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()
-        cookie_settings = {
-            "max-age": cookie_max_age,
-            "secure": settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
-            "httponly": settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
-            "samesite": settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
-        }
         response.set_cookie(
-            settings.SIMPLE_JWT["REFRESH_COOKIE"],
-            token,
-            **cookie_settings,
+            key,
+            value,
+            max_age=max_age,
+            secure=settings.SIMPLE_JWT["AUTH_COOKIE_SECURE"],
+            httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+            samesite=settings.SIMPLE_JWT["AUTH_COOKIE_SAMESITE"],
+            domain=settings.SIMPLE_JWT.get("AUTH_COOKIE_DOMAIN"),
+            path=settings.SIMPLE_JWT.get("AUTH_COOKIE_PATH", "/"),
         )
-
 
     def post(self, request, *args, **kwargs):
         try:
-            serializer = self.serializer_class(
-                data=request.data,
-                context={
-                    "request": self.request,
-                },
-            )
+            serializer = self.serializer_class(data=request.data,
+                                               context={
+                                                   "request": self.request,
+                                               },
+                                               )
             serializer.is_valid(raise_exception=True)
             validated_data = serializer.validated_data
-            access_token = validated_data['access']
-            refresh_token = validated_data['refresh']
 
-            response = Response(validated_data, status=status.HTTP_200_OK)
-            self.set_jwt_cookie(response, access_token)
-            self.set_refresh_cookie(response, refresh_token)
-            return response
-        except TokenError as ex:
-            raise InvalidToken(ex.args[0]) from ex
-        except (ValidationError, AccountLocked, Exception) as exc:
-            message = exc.args[0]
-            status_msg = "failed"
-            status_code = (
-                status.HTTP_401_UNAUTHORIZED
-                if isinstance(exc, ValidationError)
-                else (
-                    status.HTTP_423_LOCKED
-                    if isinstance(exc, AccountLocked)
-                    else status.HTTP_400_BAD_REQUEST
-                )
+            response = Response(
+                {"detail": "Login successful"}, status=status.HTTP_200_OK)
+
+            self.set_cookie(
+                response,
+                settings.SIMPLE_JWT["AUTH_COOKIE"],
+                validated_data['access'],
+                int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(
+                ))
+            )
+            self.set_cookie(
+                response,
+                settings.SIMPLE_JWT["REFRESH_COOKIE"],
+                validated_data['refresh'],
+                int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(
+                ))
             )
 
-        return CustomAPIResponse(message, status_code, status_msg).send()
+            return response
+
+        except TokenError as ex:
+            raise InvalidToken(str(ex)) from ex
+        except (ValidationError, AccountLocked) as exc:
+            status_code = (
+                status.HTTP_401_UNAUTHORIZED if isinstance(exc, ValidationError)
+                else status.HTTP_423_LOCKED if isinstance(exc, AccountLocked)
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return CustomAPIResponse(str(exc), status_code, "failed").send()
+        except Exception as exc:
+            logger.info(f'Error signing user {
+                        request.data.get('username')}: {str(exc.args[0])}')
+            return CustomAPIResponse("An error occurred. Please try again", status.HTTP_500_INTERNAL_SERVER_ERROR, "failed").send()
+
 
 
 class LogoutView(APIView):
@@ -517,7 +514,8 @@ class ResetPasswordView(UpdateAPIView):
     def patch(self, request, **kwargs):
         user = self.get_object()
         change_data = request.data
-        change_serializer = self.serializer_class(user, data=change_data)
+        change_serializer = self.serializer_class(
+            user, data=change_data)
         try:
             change_serializer.is_valid(raise_exception=True)
             change_serializer.save()
@@ -525,7 +523,8 @@ class ResetPasswordView(UpdateAPIView):
             status_msg = "success"
             status_code = status.HTTP_200_OK
         except Exception as e:
-            logger.error(f"Exception in resetPassword: {str(e.args[0])}")
+            logger.error(f"Exception in resetPassword: {
+                         str(e.args[0])}")
             message = e.args[0]
             status_msg = "failed"
             status_code = status.HTTP_400_BAD_REQUEST
@@ -576,7 +575,8 @@ class ChangeAccountView(CreateAPIView):
             status_msg = "success"
         except Exception as e:
             logger.error(
-                f"Exception in registration. Email {request.data.get('email')}: {str(e.args[0])}"
+                f"Exception in registration. Email {request.data.get('email')}: {
+                    str(e.args[0])}"
             )
             message = e.args[0]
 
@@ -586,4 +586,5 @@ class ChangeAccountView(CreateAPIView):
         if not short_id or not user:
             return
 
-        UserShortLink.objects.filter(session_id=short_id.session_id).update(user=user)
+        UserShortLink.objects.filter(
+            session_id=short_id.session_id).update(user=user)
