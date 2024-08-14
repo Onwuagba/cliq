@@ -84,7 +84,8 @@ def is_valid_time_24h_format(time_str):
     Returns:
     bool: True if the time string is valid, False otherwise.
     """
-    pattern = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9])?$")
+    pattern = re.compile(
+        r"^([01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9])?$")
     match = pattern.match(str(time_str))
 
     # Return True if it's a valid time, False otherwise
@@ -96,6 +97,7 @@ def is_valid_image(
     valid_formats=["JPEG", "PNG", "JPG", "WEBP"],
     min_width=100,
     min_height=100,
+    max_file_size=5 * 1024 * 1024,  # Default max size: 5MB
 ):
     """
     Check if the given file is a valid image.
@@ -105,11 +107,16 @@ def is_valid_image(
     valid_formats (list, optional): List of valid image formats (e.g., ["JPEG", "PNG"]).
     min_width (int, optional): Minimum width of the image.
     min_height (int, optional): Minimum height of the image.
+    max_file_size (int, optional): Maximum file size in bytes (default is 5MB).
 
     Returns:
-    bool: True if the image is valid, False otherwise.
+    tuple: (bool, str) - True if the image is valid, False otherwise and a message.
     """
     try:
+        # Check file size
+        if file.size > max_file_size:
+            return False, "File size exceeds the maximum limit of {}MB".format(max_file_size / (1024 * 1024))
+
         with Image.open(file) as img:
             # Verify the image to check for corruption
             img.verify()
