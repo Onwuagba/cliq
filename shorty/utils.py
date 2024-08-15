@@ -121,27 +121,23 @@ def is_valid_image(
             # Verify the image to check for corruption
             img.verify()
 
-            # Re-open the image file to get format and size info
-            img = Image.open(file)
+        # Re-open the image file to get format and size info
+        with Image.open(file) as img:
 
             # Check image format
-            if valid_formats and img.format not in valid_formats:
-                return False, "Invalid image format. Accepted formats: {}".format(
-                    valid_formats
-                )
+            if valid_formats and img.format.upper() not in [fmt.upper() for fmt in valid_formats]:
+                return False, f"Invalid image format. Accepted formats: {', '.join(valid_formats)}"
 
             # Check image dimensions
             width, height = img.size
             if (min_width and width < min_width) or (
                 min_height and height < min_height
             ):
-                return False, "Adjust image dimension to {}x{}".format(
-                    min_width, min_height
-                )
+                return False, f"Image dimensions should be at least {min_width}x{min_height} pixels"
 
             return True, "_"
     except Exception as e:
-        print(str(e.args[0]), file.name)
+        print(f"Error validating image {file.name}: {str(e)}")
         return False, "Error validating image"
 
 
