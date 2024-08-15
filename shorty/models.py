@@ -3,12 +3,15 @@ import secrets
 import string
 from urllib.parse import urlencode
 import uuid
+import qrcode
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
 
 from django.db import models, IntegrityError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
-from django.core.validators import URLValidator
+from django.core.validators import URLValidator, MaxValueValidator, MinValueValidator
 from django.contrib.auth.hashers import make_password, check_password
 
 from main.constants import BLACKLIST, OS_CHOICES, REDIRECT_CHOICES, STATUS
@@ -76,8 +79,10 @@ class Category(BaseModel):
 
 class Blacklist(BaseModel):
     # model to hold blacklisted ip, domain names or texts (bet,porn,etc.) to prevent shortening of links
-    entry = models.CharField(max_length=30, unique=True, db_index=True)
-    blacklist_type = models.CharField(max_length=30, choices=BLACKLIST)
+    entry = models.CharField(
+        max_length=30, unique=True, db_index=True)
+    blacklist_type = models.CharField(
+        max_length=30, choices=BLACKLIST)
 
     def __str__(self):
         return self.entry
@@ -97,7 +102,8 @@ class ShortLink(BaseModel):
     original_link = models.URLField(
         max_length=200, validators=[validate_url]
     )  # created custom unique validator. One link can have multiple utm tags which is 1-1 relationship
-    shortcode = models.CharField(max_length=50, unique=True, blank=True, db_index=True)
+    shortcode = models.CharField(
+        max_length=50, unique=True, blank=True, db_index=True)
     category = models.ForeignKey(
         Category,
         on_delete=models.CASCADE,
@@ -118,7 +124,8 @@ class ShortLink(BaseModel):
     tags = models.CharField(
         max_length=100, null=True, blank=True, db_index=True
     )  # stores comma seperated tags
-    ip_address = models.GenericIPAddressField(max_length=20, protocol="IPv4")
+    ip_address = models.GenericIPAddressField(
+        max_length=20, protocol="IPv4")
 
     custom_objects = ShortLinkManager()
 
@@ -126,18 +133,20 @@ class ShortLink(BaseModel):
         now = timezone.now()
         if self.start_date and self.expiration_date:
             if self.start_date >= self.expiration_date:
-                raise ValidationError("Start date must be before the expiration date.")
+                raise ValidationError(
+                    "Start date must be before the expiration date.")
         elif self.start_date and self.start_date <= now:
             raise ValidationError("Start date cannot be in the past.")
         elif self.expiration_date and self.expiration_date <= now:
-            raise ValidationError("Expiration date cannot be in the past.")
+            raise ValidationError(
+                "Expiration date cannot be in the past.")
         super().clean()
 
     def get_tags(self):
         return [tag.strip() for tag in self.tags.split(",")] if self.tags else []
 
     def get_full_url(self):
-        full_url = f"{self.original_link}/{self.shortcode}"
+        full_url = f"{self.original_link}"
 
         if hasattr(self, "link_utm"):
             link_utm_obj = self.link_utm
@@ -148,7 +157,8 @@ class ShortLink(BaseModel):
                 "utm_term": link_utm_obj.utm_term,
                 "utm_content": link_utm_obj.utm_content,
             }
-            utm_query_string = urlencode({k: v for k, v in utm_params.items() if v})
+            utm_query_string = urlencode(
+                {k: v for k, v in utm_params.items() if v})
             full_url = f"{full_url}?{utm_query_string}"
 
         return full_url
@@ -194,7 +204,8 @@ class UserShortLink(BaseModel):
     is_link_discoverable = models.BooleanField(default=False)
     is_link_masked = models.BooleanField(default=False)
     is_link_protected = models.BooleanField(default=False)
-    link_password = models.CharField(max_length=200, null=True, blank=True)
+    link_password = models.CharField(
+        max_length=200, null=True, blank=True)
 
     def __str__(self):
         return f"{(self.user or self.session_id)} - {self.link.shortcode}"
@@ -202,7 +213,8 @@ class UserShortLink(BaseModel):
     def clean(self):
         super().clean()
         if self.is_link_protected and not self.link_password:
-            raise ValidationError("Password is required for protected links.")
+            raise ValidationError(
+                "Password is required for protected links.")
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -213,10 +225,12 @@ class UserShortLink(BaseModel):
             # Check if the instance is being updated
             if self.pk is not None:
                 # Fetch the current password from the database
-                current_password = UserShortLink.objects.get(pk=self.pk).link_password
+                current_password = UserShortLink.objects.get(
+                    pk=self.pk).link_password
 
                 if not check_password(self.link_password, current_password):
-                    self.link_password = make_password(self.link_password)
+                    self.link_password = make_password(
+                        self.link_password)
             else:
                 # Hash the password if this is a new instance
                 self.link_password = make_password(self.link_password)
@@ -234,7 +248,8 @@ class LinkReview(BaseModel):
     status = models.CharField(
         choices=STATUS, max_length=10, default="pending", db_index=True
     )
-    reason = models.TextField(null=True, blank=True)  # needed for declined review
+    # needed for declined review
+    reason = models.TextField(null=True, blank=True)
 
     # signal is triggered whenever status changes
     def __str__(self):
@@ -292,11 +307,15 @@ class LinkUTMParameter(BaseModel):
     link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_utm"
     )
-    utm_source = models.CharField(max_length=100, null=True, blank=True)
-    utm_medium = models.CharField(max_length=100, null=True, blank=True)
-    utm_campaign = models.CharField(max_length=100, null=True, blank=True)
+    utm_source = models.CharField(
+        max_length=100, null=True, blank=True)
+    utm_medium = models.CharField(
+        max_length=100, null=True, blank=True)
+    utm_campaign = models.CharField(
+        max_length=100, null=True, blank=True)
     utm_term = models.CharField(max_length=100, null=True, blank=True)
-    utm_content = models.CharField(max_length=100, null=True, blank=True)
+    utm_content = models.CharField(
+        max_length=100, null=True, blank=True)
 
     def clean(self):
         super().clean()
@@ -309,7 +328,8 @@ class LinkUTMParameter(BaseModel):
                 self.utm_content,
             ]
         ):
-            raise ValidationError("At least one UTM parameter is required.")
+            raise ValidationError(
+                "At least one UTM parameter is required.")
 
     def __str__(self):
         return f"UTM param: {self.link.shortcode}"
@@ -331,42 +351,111 @@ class ReportLink(BaseModel):
 
 
 class QRCode(BaseModel):
-    # save info for generating QR and generate the QR code on the fly
-    # link should have a qr=True attribute
     link = models.OneToOneField(
         ShortLink, on_delete=models.CASCADE, related_name="link_qrcode"
     )
     logo = models.ImageField(
-        help_text="image to be placed inside the qr code",
-        upload_to="uploads/qrcodes/",
+        upload_to="uploads/qrcodes/logos/",
         null=True,
         blank=True,
+        help_text="Image to be placed inside the QR code"
     )
     qr_title = models.CharField(
-        help_text="Text to be displayed beneath the qr code",
         max_length=20,
         null=True,
         blank=True,
-        default="scan me",
+        default="Scan me",
+        help_text="Text to be displayed beneath the QR code"
     )
-    scan_count = models.IntegerField(default=0)
+    scan_count = models.PositiveIntegerField(default=0)
+    box_size = models.PositiveIntegerField(
+        default=10,
+        validators=[MinValueValidator(1), MaxValueValidator(50)],
+        help_text="Size of each box in the QR code"
+    )
+    border = models.PositiveIntegerField(
+        default=4,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        help_text="Size of the border around the QR code"
+    )
+    fill_color = models.CharField(
+        max_length=7,
+        default="#000000",
+        help_text="Color of the QR code (hex format)"
+    )
+    background_color = models.CharField(
+        max_length=7,
+        default="#FFFFFF",
+        help_text="Background color of the QR code (hex format)"
+    )
 
     def __str__(self):
         return f"QR Code: {self.link.shortcode}"
+
+    def generate_qr_code(self):
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=self.box_size,
+            border=self.border,
+        )
+        qr.add_data(self.link.get_full_url())
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color=self.fill_color,
+                            back_color=self.background_color).convert('RGBA')
+
+        if self.logo:
+            logo = Image.open(self.logo).convert('RGBA')
+            logo_size = (img.size[0] // 4, img.size[1] // 4)
+            logo = logo.resize(logo_size, Image.LANCZOS)
+
+            # Create a white background for the logo
+            logo_bg = Image.new('RGBA', logo.size,
+                                (255, 255, 255, 255))
+            logo_bg.paste(logo, (0, 0), logo)
+
+            pos = ((img.size[0] - logo_size[0]) // 2,
+                   (img.size[1] - logo_size[1]) // 2)
+            img.paste(logo_bg, pos, logo_bg)
+
+        if self.qr_title:
+            # Create a new image with extra space for the title
+            img_with_title = Image.new(
+                'RGBA', (img.width, img.height + 40), self.background_color)
+            img_with_title.paste(img, (0, 0))
+
+            draw = ImageDraw.Draw(img_with_title)
+            font = ImageFont.load_default()
+            text_width = draw.textlength(self.qr_title, font=font)
+            text_position = (
+                (img.width - text_width) / 2, img.height + 10)
+            draw.text(text_position, self.qr_title,
+                      fill=self.fill_color, font=font)
+
+            img = img_with_title
+
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        return buffer.getvalue()
 
 
 class Analytics(BaseModel):
     link = models.ForeignKey(
         ShortLink, on_delete=models.CASCADE, related_name="link_analytics"
     )
-    ip_address = models.GenericIPAddressField(max_length=20, null=True, blank=True)
-    os = models.CharField(max_length=30, choices=OS_CHOICES, null=True, blank=True)
-    device_type = models.CharField(max_length=60, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(
+        max_length=20, null=True, blank=True)
+    os = models.CharField(
+        max_length=30, choices=OS_CHOICES, null=True, blank=True)
+    device_type = models.CharField(
+        max_length=60, null=True, blank=True)
     click_time = models.TimeField(null=True, blank=True)
     country = models.CharField(max_length=50, null=True, blank=True)
     city = models.CharField(max_length=50, null=True, blank=True)
     language = models.CharField(max_length=50, null=True, blank=True)
-    user_agent = models.CharField(max_length=255, null=True, blank=True)
+    user_agent = models.CharField(
+        max_length=255, null=True, blank=True)
     referrer = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:

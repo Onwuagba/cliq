@@ -3,6 +3,7 @@ from django.urls import path
 from shorty.views import (
     BlacklistCheck,
     CategoryView,
+    QRCodeView,
     ShortLinkView,
     ShortlinkDetailView,
     ValidateImage,
@@ -20,4 +21,5 @@ urlpatterns = [
     ),
     path("blacklist/", BlacklistCheck.as_view(), name="blacklist"),
     path("validate_image/", ValidateImage.as_view(), name="validate_image"),
+    path('qrcode/<str:shortcode>/', QRCodeView.as_view(), name='generate_qrcode'),
 ]

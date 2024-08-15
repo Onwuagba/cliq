@@ -85,7 +85,8 @@ class ChecksumMiddleware(MiddlewareMixin):
         if request.content_type == 'multipart/form-data':
             # For multipart form data, use only the POST data for HMAC
             # for image upload in qr generation
-            data = json.dumps(request.POST.dict(), sort_keys=True).encode("utf-8")
+            data = json.dumps(request.POST.dict(),
+                              sort_keys=True).encode("utf-8")
             return hmac.new(key, data, hashlib.sha256).hexdigest()
         elif isinstance(data, bytes):
             return hmac.new(key, data, hashlib.sha256).hexdigest()

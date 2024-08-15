@@ -18,7 +18,8 @@ SECRET_KEY = os.getenv("SL_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("SL_DEBUG", False)
 
-ALLOWED_HOSTS = ["*"] if DEBUG else os.getenv("SL_ALLOWED_HOSTS").split(",")
+ALLOWED_HOSTS = [
+    "*"] if DEBUG else os.getenv("SL_ALLOWED_HOSTS").split(",")
 
 
 # Application definition
@@ -54,6 +55,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = "shortlink.urls"
 APPEND_SLASH = True
 AUTH_USER_MODEL = "main.UserAccount"
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
 
 TEMPLATES = [
     {
@@ -97,9 +99,11 @@ SWAGGER_SETTINGS = {
 }
 
 # CELERY
-CELERY_BROKER_URL = "redis://" + os.getenv("REDIS_HOST") + ":" + os.getenv("REDIS_PORT")
+CELERY_BROKER_URL = "redis://" + \
+    os.getenv("REDIS_HOST") + ":" + os.getenv("REDIS_PORT")
 CELERY_RESULT_BACKEND = (
-    "redis://" + os.getenv("REDIS_HOST") + ":" + os.getenv("REDIS_PORT")
+    "redis://" + os.getenv("REDIS_HOST") + ":" +
+    os.getenv("REDIS_PORT")
 )
 CELERY_TIMEZONE = "Africa/Lagos"
 # CELERY_BEAT_SCHEDULE = {
@@ -203,20 +207,27 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "AUTH_HEADER_TYPES": ("Bearer",),
     # "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=5),
-    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=8000),  # development
+    # development
+    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=8000),
     "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=1),
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "UPDATE_LAST_LOGIN": True,
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
-    "AUTH_COOKIE": "ace_jwt",  # Cookie name. Enables cookies if value is set.
-    "REFRESH_COOKIE": "ref_jwt",  # Cookie name. Enables cookies if value is set.
-    "AUTH_COOKIE_SECURE": True,  # Whether the auth cookies should be secure (https:// only).
-    "AUTH_COOKIE_HTTP_ONLY": True,  # Http only cookie flag.It's not fetch by javascript.
+    # Cookie name. Enables cookies if value is set.
+    "AUTH_COOKIE": "ace_jwt",
+    # Cookie name. Enables cookies if value is set.
+    "REFRESH_COOKIE": "ref_jwt",
+    # Whether the auth cookies should be secure (https:// only).
+    "AUTH_COOKIE_SECURE": True,
+    # Http only cookie flag.It's not fetch by javascript.
+    "AUTH_COOKIE_HTTP_ONLY": True,
     "AUTH_COOKIE_PATH": "/",  # The path of the auth cookie.
-    "AUTH_COOKIE_SAMESITE": "Lax",  # Whether to set the flag restricting cookie leaks on cross-site requests.
+    # Whether to set the flag restricting cookie leaks on cross-site requests.
+    "AUTH_COOKIE_SAMESITE": "Lax",
     # This can be 'Lax', 'Strict', or None to disable the flag.
-    "AUTH_COOKIE_DOMAIN": None,  # A string like "example.com", or None for standard domain cookie.
+    # A string like "example.com", or None for standard domain cookie. If AUTH_COOKIE_DOMAIN is not set (i.e., it's None), Django will use the current domain.
+    "AUTH_COOKIE_DOMAIN": None,
 }
 
 REST_FRAMEWORK = {

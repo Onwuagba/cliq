@@ -6,6 +6,7 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.http import HttpResponse
 from django.utils import timezone
 from dotenv import load_dotenv
 from rest_framework.views import APIView
@@ -21,7 +22,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError, NotFoun
 
 from common.permissions import IsAdmin, IsIPPermitted
 from common.utilities.api_response import CustomAPIResponse
-from shorty.models import Blacklist, Category, ShortLink, UserShortLink
+from shorty.models import Blacklist, Category, QRCode, ShortLink, UserShortLink
 from shorty.serializers import CategorySerializer, ShortLinkSerializer
 from shorty.utils import (
     contains_blacklisted_texts,
@@ -57,7 +58,8 @@ class CategoryView(ListAPIView):
         status_msg = "failed"
 
         try:
-            serializer = self.serializer_class(self.get_queryset(), many=True)
+            serializer = self.serializer_class(
+                self.get_queryset(), many=True)
             if dat := serializer.data:
                 message = dat
                 status_code = status.HTTP_200_OK
@@ -65,7 +67,8 @@ class CategoryView(ListAPIView):
             else:
                 message = "No category found"
         except Exception as e:
-            logger.error(f"Exception in CategoryView: {str(e.args[0])}")
+            logger.error(f"Exception in CategoryView: {
+                         str(e.args[0])}")
             message = e.args[0]
 
         return CustomAPIResponse(message, status_code, status_msg).send()
@@ -151,7 +154,8 @@ class ShortLinkView(ListAPIView):
 
     def get_queryset(self, user: UserShortLink):
         return ShortLink.custom_objects.filter(
-            Q(link_shortlink__user=user) | Q(link_shortlink__session_id=user)
+            Q(link_shortlink__user=user) | Q(
+                link_shortlink__session_id=user)
         )
 
     def get(self, request):
@@ -192,14 +196,16 @@ class ShortLinkView(ListAPIView):
 
             if page := self.paginate_queryset(queryset):
                 serializer = self.serializer_class(page, many=True)
-                query_response = self.get_paginated_response(serializer.data)
+                query_response = self.get_paginated_response(
+                    serializer.data)
                 message = query_response.data
                 status_code = status.HTTP_200_OK
                 status_msg = "success"
             else:
                 message = "No links created yet"
         except Exception as e:
-            logger.error(f"Exception in ShortLinkView: {str(e.args[0])}")
+            logger.error(f"Exception in ShortLinkView: {
+                         str(e.args[0])}")
             message = str(e.args[0])
 
         return CustomAPIResponse(message, status_code, status_msg).send()
@@ -239,7 +245,8 @@ class ShortLinkView(ListAPIView):
             if is_domain_blacklisted(original_link) or contains_blacklisted_texts(
                 original_link
             ):
-                raise Exception("Link not allowed. Please request a manual review.")
+                raise Exception(
+                    "Link not allowed. Please request a manual review.")
 
             if is_ip_blacklisted(user_ip):
                 raise PermissionDenied("Request not permitted")
@@ -273,7 +280,8 @@ class ShortLinkView(ListAPIView):
             status_msg = "success"
             status_code = status.HTTP_201_CREATED
         except (PermissionDenied, Exception) as e:
-            logger.error(f"POST Exception in ShortLinkView: {str(e.args[0])}")
+            logger.error(f"POST Exception in ShortLinkView: {
+                         str(e.args[0])}")
             message = str(e.args[0])
             status_code = (
                 status.HTTP_403_FORBIDDEN
@@ -308,7 +316,8 @@ class ShortLinkView(ListAPIView):
             if "redirect_link" in link_dict and not link_dict[
                 "redirect_link"
             ].startswith(("http://", "https://")):
-                link_dict["redirect_link"] = f"http://{link_dict['redirect_link']}"
+                link_dict["redirect_link"] = f"http://{
+                    link_dict['redirect_link']}"
 
             updated_links_redirect.append(link_dict)
 
@@ -345,10 +354,12 @@ class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
         """
         try:
             obj = (
-                ShortLink.objects.get(shortcode=self.kwargs["shortcode"])
+                ShortLink.objects.get(
+                    shortcode=self.kwargs["shortcode"])
                 if not user
                 else ShortLink.objects.get(
-                    (Q(link_shortlink__user=user) | Q(link_shortlink__session_id=user)),
+                    (Q(link_shortlink__user=user) | Q(
+                        link_shortlink__session_id=user)),
                     shortcode=self.kwargs["shortcode"],
                 )  # for patch
             )
@@ -384,7 +395,8 @@ class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
             message = str(ex.args[0])
             status_code = status.HTTP_404_NOT_FOUND
         except Exception as e:
-            logger.error(f"Exception in ShortlinkDetailView: {str(e.args[0])}")
+            logger.error(f"Exception in ShortlinkDetailView: {
+                         str(e.args[0])}")
             message = str(e.args[0])
 
         return CustomAPIResponse(message, status_code, status_msg).send()
@@ -408,7 +420,8 @@ class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
                 ).send()
 
             obj = self.get_object(user)
-            serializer = self.serializer_class(obj, data=request.data, partial=True)
+            serializer = self.serializer_class(
+                obj, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
             message = "Link updated successfully"
@@ -418,7 +431,8 @@ class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
             message = str(ex.args[0])
             status_code = status.HTTP_404_NOT_FOUND
         except Exception as e:
-            logger.error(f"Exception in ShortlinkDetailView: {str(e.args[0])}")
+            logger.error(f"Exception in ShortlinkDetailView: {
+                         str(e.args[0])}")
             message = str(e.args[0])
 
         return CustomAPIResponse(message, status_code, status_msg).send()
@@ -451,14 +465,15 @@ class ShortlinkDetailView(RetrieveUpdateDestroyAPIView):
             message = str(ex.args[0])
             status_code = status.HTTP_404_NOT_FOUND
         except Exception as e:
-            logger.error(f"Exception in ShortlinkDetailView: {str(e.args[0])}")
+            logger.error(f"Exception in ShortlinkDetailView: {
+                         str(e.args[0])}")
             message = str(e.args[0])
 
         return CustomAPIResponse(message, status_code, status_msg).send()
 
 
 ######################
-#### GENERICS
+# GENERICS
 ######################
 
 
@@ -554,3 +569,122 @@ class ValidateImage(APIView):
             status_msg = "failed"
 
         return CustomAPIResponse(message, status_code, status_msg).send()
+
+
+class QRCodeView(APIView):
+    # qr code is generated on the fly.
+    # check notes for comparison between this and saving to DB
+    permission_classes = (IsAuthenticated,)
+    http_method_names = ["get", "post", "put"]
+
+    def get(self, request, shortcode: str):
+        try:
+            qr_code = self.get_qr_code(request.user, shortcode)
+            qr_image = qr_code.generate_qr_code()
+
+            response = HttpResponse(content_type='image/png')
+            response['Content-Disposition'] = f'attachment; filename="{
+                shortcode.lower()}_qr.png"'
+            response.write(qr_image)
+
+            return response
+
+        except (ShortLink.DoesNotExist, QRCode.DoesNotExist, UserShortLink.DoesNotExist):
+            return CustomAPIResponse(
+                "QR code not found",
+                status.HTTP_404_NOT_FOUND,
+                "failed"
+            ).send()
+        except Exception as e:
+            logger.error('Exception retrieving QR code: %s', e)
+            return CustomAPIResponse(
+                "Oops! An error occurred",
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "failed"
+            ).send()
+
+    def post(self, request, shortcode):
+        try:
+            qr_code = self.get_qr_code(request.user, shortcode)
+
+            # Update QR code properties if provided in the request
+            self.update_qr_code(qr_code, request.data, request.FILES)
+            qr_image = qr_code.generate_qr_code()
+
+            response = HttpResponse(content_type='image/png')
+            response['Content-Disposition'] = f'attachment; filename="{
+                shortcode}_qr.png"'
+            response.write(qr_image)
+
+            return response
+
+        except (ShortLink.DoesNotExist, QRCode.DoesNotExist, UserShortLink.DoesNotExist) as ef:
+            logger.error('Link not found : %s', ef)
+            return CustomAPIResponse(
+                "Short link not found",
+                status.HTTP_404_NOT_FOUND,
+                "failed"
+            ).send()
+        except Exception as e:
+            logger.error('Exception while creating QR code : %s', e)
+            return CustomAPIResponse(
+                str(e),
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "failed"
+            ).send()
+
+    def put(self, request, shortcode):
+        try:
+            qr_code = self.get_qr_code(request.user, shortcode)
+            self.update_qr_code(qr_code, request.data, request.FILES)
+            return CustomAPIResponse(
+                "QR code updated successfully",
+                status.HTTP_200_OK,
+                "success"
+            ).send()
+        except ShortLink.DoesNotExist:
+            return CustomAPIResponse(
+                "Short link not found",
+                status.HTTP_404_NOT_FOUND,
+                "failed"
+            ).send()
+        except Exception as e:
+            logger.error('Exception updating QR code: %s', e)
+            return CustomAPIResponse(
+                str(e),
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "failed"
+            ).send()
+
+    def get_qr_code(self, user, shortcode):
+        logger.info(
+            "get_qr_code from user: %s, shortcode: %s", user, shortcode)
+        short_link = ShortLink.objects.get(shortcode=shortcode)
+        UserShortLink.objects.get(
+            link=short_link, user=user)
+        qr_code, _ = QRCode.objects.get_or_create(link=short_link)
+        return qr_code
+
+    def update_qr_code(self, qr_code, data, files):
+        qr_code.box_size = data.get('box_size', qr_code.box_size)
+        qr_code.border = data.get('border', qr_code.border)
+        qr_code.fill_color = data.get(
+            'fill_color', qr_code.fill_color)
+        qr_code.background_color = data.get(
+            'background_color', qr_code.background_color)
+        qr_code.qr_title = data.get('qr_title', qr_code.qr_title)
+
+        if 'logo' in files:
+            logo_file = files['logo']
+            is_valid, message = is_valid_image(
+                logo_file,
+                valid_formats=["PNG", "JPEG", "JPG"],
+                min_width=100,
+                min_height=100,
+                max_file_size=2 * 1024 * 1024  # 2 MB max file size for logos
+            )
+            if not is_valid:
+                raise ValueError(message)
+            qr_code.logo = logo_file
+
+        qr_code.save()
