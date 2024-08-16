@@ -183,6 +183,9 @@ class ShortLink(BaseModel):
         else:
             super().save(*args, **kwargs)
 
+    def has_qr_code(self):
+        return hasattr(self, 'link_qrcode')
+
     def __str__(self):
         return self.shortcode
 

@@ -33,7 +33,8 @@ class UserShortLinkSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(
         max_length=50, read_only=True, source="user.email"
     )
-    link_password = serializers.CharField(write_only=True, required=False)
+    link_password = serializers.CharField(
+        write_only=True, required=False)
 
     class Meta:
         model = UserShortLink
@@ -141,7 +142,8 @@ class AnalyticsSerializer(serializers.ModelSerializer):
 class ShortLinkSerializer(serializers.ModelSerializer):
     ip_address = serializers.IPAddressField(write_only=True)
     tags = serializers.CharField(write_only=True, required=False)
-    category_name = serializers.CharField(source="category.name", read_only=True)
+    category_name = serializers.CharField(
+        source="category.name", read_only=True)
     is_link_discoverable = serializers.BooleanField(
         default=False,
         source="link_shortlink.is_link_discoverable",
@@ -152,7 +154,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     is_link_protected = serializers.BooleanField(
         default=False, source="link_shortlink.is_link_protected"
     )
-    manual_review = serializers.BooleanField(default=False, write_only=True)
+    manual_review = serializers.BooleanField(
+        default=False, write_only=True)
     link_password = serializers.CharField(
         write_only=True, source="link_shortlink.link_password", required=False
     )
@@ -168,7 +171,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
     expiration_date = serializers.DateTimeField(
         format="%Y-%m-%d %H:%M:%S", input_formats=None, required=False
     )
-    full_url = serializers.URLField(source="get_full_url", read_only=True)
+    full_url = serializers.URLField(
+        source="get_full_url", read_only=True)
 
     class Meta:
         model = ShortLink
@@ -190,6 +194,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             "link_password",
             "manual_review",
             "user",
+            "has_qr_code",
             "link_card",
             "link_utm",
             "link_redirect",
@@ -205,9 +210,10 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         # Ensure the original link is correctly formatted before any other processing
         original_link = data.get('original_link')
         if original_link:
-            data['original_link'] = self.validate_original_link(original_link)
+            data['original_link'] = self.validate_original_link(
+                original_link)
         return super().to_internal_value(data)
-    
+
     def create(self, validated_data):
         # Extract nested data
         link_shortlink_data = validated_data.pop("link_shortlink", {})
@@ -227,10 +233,12 @@ class ShortLinkSerializer(serializers.ModelSerializer):
 
                 if category_name:
                     validated_data["category"], _ = Category.objects.get_or_create(
-                        name__iexact=category_name, defaults={"name": category_name}
+                        name__iexact=category_name, defaults={
+                            "name": category_name}
                     )
 
-                short_link = ShortLink.objects.create(**validated_data)
+                short_link = ShortLink.objects.create(
+                    **validated_data)
 
                 if manual_review:
                     LinkReview.objects.create(link=short_link)
@@ -244,7 +252,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
                     )  # delete the record sent from the request
                     link_shortlink_data[user_key] = user_obj
 
-                self._create_user_shortlink(short_link, link_shortlink_data)
+                self._create_user_shortlink(
+                    short_link, link_shortlink_data)
 
                 # Create nested instance for LinkCard, LinkUTMParameter and LinkRedirect
                 self._create_nested_instances(
@@ -254,7 +263,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         except DjangoValidationError as e:
             # Extract the error message from the DjangoValidationError
             error_message = e.messages[0] if e.messages else "An error occurred"
-            logger.error(f"Validation error creating link: {str(e.args[0])}")
+            logger.error(f"Validation error creating link: {
+                         str(e.args[0])}")
             raise DRFValidationError(error_message)
 
         except IntegrityError as e:
@@ -269,7 +279,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
 
         except Exception as e:
             logger.error(f"Error creating link: {e}")
-            raise DRFValidationError("An error occurred while creating the link")
+            raise DRFValidationError(
+                "An error occurred while creating the link")
 
         return short_link
 
@@ -278,14 +289,16 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         link_card_data = validated_data.pop("link_card", None)
         link_utm_data = validated_data.pop("link_utm", None)
         link_redirect_data = validated_data.pop("link_redirect", None)
-        link_shortlink_data = validated_data.pop("link_shortlink", None)
+        link_shortlink_data = validated_data.pop(
+            "link_shortlink", None)
 
         try:
             with transaction.atomic():
                 # Handle category creation or update
                 if category_name:
                     category, _ = Category.objects.get_or_create(
-                        name__iexact=category_name, defaults={"name": category_name}
+                        name__iexact=category_name, defaults={
+                            "name": category_name}
                     )
                     validated_data["category"] = category
 
@@ -323,7 +336,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         shortcode = shortcode or generate_shortcode()
         if not ShortLink.objects.filter(shortcode__iexact=shortcode).exists():
             return shortcode
-        raise ValidationError("Shortcode %s already exists" % shortcode)
+        raise ValidationError(
+            "Shortcode %s already exists" % shortcode)
 
     def _get_user_instance(self, user_id):
         """
@@ -361,7 +375,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
         Returns:
             None
         """
-        UserShortLink.objects.create(link=short_link, **link_shortlink_data)
+        UserShortLink.objects.create(
+            link=short_link, **link_shortlink_data)
 
     def _create_nested_instances(
         self, short_link, link_cards_data, link_utms_data, link_redirects_data
@@ -386,12 +401,14 @@ class ShortLinkSerializer(serializers.ModelSerializer):
             link_redirect_serializer.save(link=short_link)
 
         if link_utms_data:
-            link_utm_serializer = LinkUTMParameterSerializer(data=link_utms_data)
+            link_utm_serializer = LinkUTMParameterSerializer(
+                data=link_utms_data)
             link_utm_serializer.is_valid(raise_exception=True)
             link_utm_serializer.save(link=short_link)
 
         if link_cards_data:
-            link_card_serializer = LinkCardSerializer(data=link_cards_data)
+            link_card_serializer = LinkCardSerializer(
+                data=link_cards_data)
             link_card_serializer.is_valid(raise_exception=True)
             link_card_serializer.save(link=short_link)
 
@@ -417,7 +434,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
                     short_link.link_card, data=link_cards_data
                 )
             else:
-                link_card_serializer = LinkCardSerializer(data=link_cards_data)
+                link_card_serializer = LinkCardSerializer(
+                    data=link_cards_data)
             link_card_serializer.is_valid(raise_exception=True)
             link_card_serializer.save(link=short_link)
 
@@ -428,7 +446,8 @@ class ShortLinkSerializer(serializers.ModelSerializer):
                     short_link.link_utm, data=link_utms_data
                 )
             else:
-                link_utm_serializer = LinkUTMParameterSerializer(data=link_utms_data)
+                link_utm_serializer = LinkUTMParameterSerializer(
+                    data=link_utms_data)
             link_utm_serializer.is_valid(raise_exception=True)
             link_utm_serializer.save(link=short_link)
 
@@ -445,6 +464,7 @@ class ShortLinkSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
-        response.update({"session_id": instance.link_shortlink.session_id})
+        response.update(
+            {"session_id": instance.link_shortlink.session_id})
 
         return response
