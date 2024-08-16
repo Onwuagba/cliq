@@ -1,4 +1,5 @@
 import ipaddress
+import os
 import secrets
 import string
 from urllib.parse import urlencode
@@ -420,18 +421,31 @@ class QRCode(BaseModel):
             img.paste(logo_bg, pos, logo_bg)
 
         if self.qr_title:
-            # Create a new image with extra space for the title
-            img_with_title = Image.new(
-                'RGBA', (img.width, img.height + 40), self.background_color)
-            img_with_title.paste(img, (0, 0))
+            # Load a larger font
+            font_path = os.path.join(os.path.dirname(
+                __file__), 'font', 'Roboto', 'Roboto-Bold.ttf')
+            font_size = 30
+            font = ImageFont.truetype(font_path, font_size)
 
+            # Calculate the size needed for the title
+            draw = ImageDraw.Draw(
+                Image.new('RGBA', (1, 1), (0, 0, 0, 0)))
+            _, _, text_width, text_height = draw.textbbox(
+                (0, 0), text=self.qr_title, font=font)
+
+            # Create a new image with extra space for the title
+            new_height = img.height + text_height + 20  # 20 pixels padding
+            img_with_title = Image.new('RGBA', (max(
+                img.width, text_width + 20), new_height), self.background_color)
+            img_with_title.paste(
+                img, ((img_with_title.width - img.width) // 2, 0))
+
+            # Draw the title
             draw = ImageDraw.Draw(img_with_title)
-            font = ImageFont.load_default()
-            text_width = draw.textlength(self.qr_title, font=font)
             text_position = (
-                (img.width - text_width) / 2, img.height + 10)
-            draw.text(text_position, self.qr_title,
-                      fill=self.fill_color, font=font)
+                (img_with_title.width - text_width) // 2, img.height + 10)
+            draw.text(text_position, self.qr_title.capitalize(),
+                      font=font, fill=self.fill_color)
 
             img = img_with_title
 
