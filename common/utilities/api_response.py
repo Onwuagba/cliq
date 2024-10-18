@@ -22,36 +22,62 @@ class CustomAPIResponse:
 
     def send(self) -> Response:
         """
-        Sends data back as a HTTP response.
-
-        Args:
-            self: The instance of the class.
+        Sends data back as an HTTP response.
 
         Returns:
             A Response object with the data and status code.
         """
-
         if not all([self.message, self.status_code, self.status]):
-            raise ValidationError("message and status code cannot be empty")
+            raise ValidationError(
+                "message, status_code, and status cannot be empty")
 
-        data = {"status": self.status}
+        data = {"status": self.status, "data": "", "error": ""}
+
         if self.status == "failed":
-            if isinstance(self.message, (ValidationError, ValueError)):
-                data["message"] = self.message.args[0]
-            elif isinstance(self.message, dict):
-                data["message"] = self.convert_to_string(self.message)
-            else:
-                data["message"] = self.message
+            data["error"] = self._get_error_message()
         else:
             data["data"] = self.message
-        status_code = self.status_code
 
-        return Response(data, status=status_code)
+        return Response(data, status=self.status_code)
 
-    def convert_to_string(self, message):
-        res = []
-        for key, value in message.items():
-            if isinstance(value, list):
-                value = " ".join(value)
-            res.append(f"{key.upper().replace('_', ' ')}: {value}")
-        return "| ".join(res)
+    def _get_error_message(self):
+        """
+        Extracts the error message from the given error.
+
+        If the error is a dict with an 'error' key, it will be extracted.
+        If the error is an instance of ValidationError, ValueError, or Exception, it will be converted to a str.
+        Otherwise, the error is converted to a str directly.
+
+        :return: The error message as a str.
+        """
+        if isinstance(self.message, dict) and 'error' in self.message:
+            return self._extract_error_detail(self.message['error'])
+        elif isinstance(self.message, (ValidationError, ValueError, Exception)):
+            return self._extract_error_detail(self.message)
+        else:
+            return str(self.message)
+
+    def _extract_error_detail(self, error):
+        """
+        Extracts the error message from the given error.
+
+        If the error has a 'detail' attribute, it is checked first. If it is a list, the first element is returned as a str.
+        If it is a dict, the first value is returned as a str.
+        If the error is a list, the first element is returned as a str.
+        If the error is an instance of ValidationError, ValueError, or Exception, the first argument is returned as a str.
+        Otherwise, the error is converted to a str directly.
+
+        :param error: The error to extract the message from.
+        :return: The error message as a str.
+        """
+        if hasattr(error, 'detail'):
+            error_detail = error.detail
+            if isinstance(error_detail, list):
+                return str(error_detail[0])
+            elif isinstance(error_detail, dict):
+                return str(next(iter(error_detail.values()))[0])
+        elif isinstance(error, list) and error:
+            return str(error[0])
+        elif hasattr(error, 'args') and error.args:
+            return str(error.args[0])
+        return str(error)

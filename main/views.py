@@ -428,48 +428,50 @@ class CustomTokenView(jwt_views.TokenObtainPairView):
 
     def post(self, request, *args, **kwargs):
         try:
-            serializer = self.serializer_class(data=request.data,
-                                               context={
-                                                   "request": self.request,
-                                               },
-                                               )
+            serializer = self.serializer_class(
+                data=request.data, context={"request": self.request})
             serializer.is_valid(raise_exception=True)
             validated_data = serializer.validated_data
 
             response = Response(
-                {"detail": "Login successful"}, status=status.HTTP_200_OK)
-
-            self.set_cookie(
-                response,
-                settings.SIMPLE_JWT["AUTH_COOKIE"],
-                validated_data['access'],
-                int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(
-                ))
-            )
-            self.set_cookie(
-                response,
-                settings.SIMPLE_JWT["REFRESH_COOKIE"],
-                validated_data['refresh'],
-                int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(
-                ))
+                {"data": "Login successful",
+                    "status": "success", "error": ""},
+                status=status.HTTP_200_OK
             )
 
+            self._set_auth_cookies(response, validated_data)
             return response
 
-        except TokenError as ex:
-            raise InvalidToken(str(ex)) from ex
-        except (ValidationError, AccountLocked) as exc:
-            status_code = (
-                status.HTTP_401_UNAUTHORIZED if isinstance(exc, ValidationError)
-                else status.HTTP_423_LOCKED if isinstance(exc, AccountLocked)
-                else status.HTTP_400_BAD_REQUEST
-            )
-            return CustomAPIResponse(str(exc), status_code, "failed").send()
         except Exception as exc:
-            logger.info(f'Error signing user {
-                        request.data.get('username')}: {str(exc.args[0])}')
-            return CustomAPIResponse("An error occurred. Please try again", status.HTTP_500_INTERNAL_SERVER_ERROR, "failed").send()
+            return self._handle_exception(exc, request)
 
+    def _set_auth_cookies(self, response, validated_data):
+        for cookie_name, token_key, lifetime_key in [
+            (settings.SIMPLE_JWT["AUTH_COOKIE"],
+             'access', "ACCESS_TOKEN_LIFETIME"),
+            (settings.SIMPLE_JWT["REFRESH_COOKIE"],
+             'refresh', "REFRESH_TOKEN_LIFETIME")
+        ]:
+            self.set_cookie(
+                response,
+                cookie_name,
+                validated_data[token_key],
+                int(settings.SIMPLE_JWT[lifetime_key].total_seconds())
+            )
+
+    def _handle_exception(self, exc, request):
+        if isinstance(exc, TokenError):
+            return CustomAPIResponse(str(exc), status.HTTP_400_BAD_REQUEST, "failed").send()
+        elif isinstance(exc, ValidationError):
+            return CustomAPIResponse(exc, status.HTTP_401_UNAUTHORIZED, "failed").send()
+        elif isinstance(exc, AccountLocked):
+            return CustomAPIResponse(str(exc), status.HTTP_423_LOCKED, "failed").send()
+        else:
+            logger.error(
+                f"Error signing user {request.data.get('username')}: {str(exc)}")
+            return CustomAPIResponse(
+                "An error occurred. Please try again",
+                status.HTTP_500_INTERNAL_SERVER_ERROR, "failed").send()
 
 
 class LogoutView(APIView):

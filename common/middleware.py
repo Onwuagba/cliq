@@ -10,9 +10,11 @@ from django.conf import settings
 from django.contrib import auth
 from django.utils import timezone
 from django.http import HttpResponseForbidden, JsonResponse
+from django.urls import resolve
 from django.utils.deprecation import MiddlewareMixin
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import AllowAny
 
 from shortlink.settings import ALLOWED_ADMIN_IPS
 
@@ -81,7 +83,8 @@ class ChecksumMiddleware(MiddlewareMixin):
         Returns:
             str: The computed HMAC as a hexadecimal string, or None if the data type is not supported.
         """
-        data = request.body
+        data = request.body if hasattr(
+            request, 'body') and request.body else request.data
         if request.content_type == 'multipart/form-data':
             # For multipart form data, use only the POST data for HMAC
             # for image upload in qr generation
@@ -114,11 +117,24 @@ class ChecksumMiddleware(MiddlewareMixin):
         """
         if request.method in ["POST", "PUT", "PATCH"]:
             try:
+                resolver_match = resolve(request.path)
+                view_class = resolver_match.func.view_class
+
+                # Check if the view has permission classes
+                if hasattr(view_class, 'permission_classes'):
+                    permissions = view_class.permission_classes
+
+                # Check if permission is AllowAny
+                if AllowAny in permissions:
+                    return
+
                 if not request.body or request.path.startswith("/admin/"):
                     # qr code generation is a POST request & may not have a body
                     return
                 received_hmac = request.META.get("HTTP_X_HMAC")
                 if not received_hmac:
+                    logger.info(
+                        'No HMAC value sent with request: %s' % request.META)
                     return JsonResponse(
                         {
                             "message": "Invalid request",
@@ -133,7 +149,7 @@ class ChecksumMiddleware(MiddlewareMixin):
                 if received_hmac != computed_hmac:
                     return JsonResponse(
                         {
-                            "message": "Request validation failed. Ensure request is correctly signed",
+                            "data": "Request validation failed",
                             "status": "failed",
                             # "computed_hmac": computed_hmac,
                             # "received_hmac": received_hmac,
@@ -160,9 +176,9 @@ class ChecksumMiddleware(MiddlewareMixin):
         """
         if response["Content-Type"] == "application/json":
             try:
-                payload = response.content
                 secret_key = settings.SECRET_KEY.encode("utf-8")
-                computed_hmac = self.compute_hmac(payload, secret_key)
+                computed_hmac = self.compute_hmac(
+                    response, secret_key)
                 response["X-HMAC"] = computed_hmac
             except Exception as e:
                 response["X-HMAC-Error"] = str(e)
